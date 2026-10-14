@@ -1,0 +1,103 @@
+<%
+function parsePriority(name) {
+    const m = (name || '').match(/^\[(HIGH|LOW)\]\s*/);
+    if (m) return { clean: name.slice(m[0].length), priority: m[1] };
+    return { clean: name, priority: null };
+}
+%>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h2 style="margin:0;color:var(--heading-color);">Completed Sessions</h2>
+    <span id="histCount" style="font-size:0.85rem;color:var(--link-color);"><%= sessions.length %> session<%= sessions.length !== 1 ? 's' : '' %></span>
+</div>
+
+<% if (sessions.length > 0) { %>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px;">
+    <select id="histGroupFilter" onchange="applyHistoryFilters()" style="flex:1;min-width:120px;">
+        <option value="">All groups</option>
+        <% Object.values(groupMap).forEach(function(g) { %>
+        <option value="<%= g._id.toString() %>"><%= g.name %></option>
+        <% }); %>
+    </select>
+    <input type="date" id="histDateFrom" onchange="applyHistoryFilters()" title="From date" style="flex:1;min-width:120px;">
+    <input type="date" id="histDateTo"   onchange="applyHistoryFilters()" title="To date"   style="flex:1;min-width:120px;">
+    <button type="button" onclick="clearHistoryFilters()" style="flex-shrink:0;font-size:0.85rem;padding:8px 12px;background:transparent;border:1px solid var(--form-border-color);color:var(--text-color);">Clear</button>
+</div>
+<% } %>
+
+<% if (sessions.length === 0) { %>
+<div class="empty-state">
+    <p>No completed sessions yet. <a href="/add">Add a session to get started.</a></p>
+</div>
+<% } else { %>
+
+<div id="historyList">
+<% sessions.forEach(function(s) {
+    const g = s.groupId && groupMap[s.groupId.toString()] ? groupMap[s.groupId.toString()] : null;
+    const p = parsePriority(s.name);
+    const doneTasks = s.tasks.filter(t => t.done).length;
+    const totalTasks = s.tasks.length;
+    const displayDate = s.completedAt || s.date;
+    const isoDate = displayDate ? new Date(displayDate).toISOString().slice(0,10) : '';
+%>
+<div class="session-card" data-group-id="<%= g ? g._id.toString() : '' %>" data-date="<%= isoDate %>">
+    <div class="group-stripe" style="background-color: <%= g ? g.color : 'var(--link-color)' %>;"></div>
+    <div class="session-info">
+        <p class="session-name">
+            <% if (p.priority) { %><span class="priority-badge priority-<%= p.priority.toLowerCase() %>"><%= p.priority %></span><% } %>
+            <%= p.clean %>
+        </p>
+        <p class="session-meta">
+            <%= g ? g.name : 'No Group' %>&nbsp;&middot;&nbsp;<span class="fmt-date" data-date="<%= displayDate %>"></span>
+        </p>
+        <% if (totalTasks > 0) { %>
+        <p class="session-meta"><%= doneTasks %>/<%= totalTasks %> task<%= totalTasks !== 1 ? 's' : '' %> done</p>
+        <% } %>
+    </div>
+    <div class="session-actions">
+        <form method="POST" action="/history/delete/<%= s._id %>" style="display:inline;" onsubmit="return confirm('Remove this session from history?')">
+            <button type="submit" class="btn-danger btn-sm">Delete</button>
+        </form>
+    </div>
+</div>
+<% }); %>
+</div>
+
+<% } %>
+
+<script>
+    document.querySelectorAll('.fmt-date').forEach(el => {
+        const d = el.dataset.date;
+        if (d) el.textContent = moment(d).calendar();
+    });
+
+    function applyHistoryFilters() {
+        var group = (document.getElementById('histGroupFilter') || {}).value || '';
+        var from  = (document.getElementById('histDateFrom')   || {}).value || '';
+        var to    = (document.getElementById('histDateTo')     || {}).value || '';
+        var cards = document.querySelectorAll('#historyList .session-card');
+        var visible = 0;
+        cards.forEach(function(card) {
+            var gid  = card.dataset.groupId || '';
+            var date = card.dataset.date    || '';
+            var show = true;
+            if (group && gid !== group) show = false;
+            if (from  && date < from)   show = false;
+            if (to    && date > to)     show = false;
+            card.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        var countEl = document.getElementById('histCount');
+        if (countEl) countEl.textContent = visible + ' session' + (visible !== 1 ? 's' : '');
+    }
+
+    function clearHistoryFilters() {
+        var gf = document.getElementById('histGroupFilter');
+        var df = document.getElementById('histDateFrom');
+        var dt = document.getElementById('histDateTo');
+        if (gf) gf.value = '';
+        if (df) df.value = '';
+        if (dt) dt.value = '';
+        applyHistoryFilters();
+    }
+</script>

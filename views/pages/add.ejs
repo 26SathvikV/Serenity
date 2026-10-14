@@ -1,0 +1,332 @@
+<style>
+    .add-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .group-swatch {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    .groups-list {
+        margin-top: 32px;
+    }
+
+    .group-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 14px;
+        background-color: var(--form-bg-color);
+        border: 1px solid var(--form-border-color);
+        border-radius: 5px;
+        margin-bottom: 8px;
+    }
+</style>
+
+<div class="add-container">
+    <div class="tab-bar">
+        <button class="tab-btn active" id="tabSession" onclick="switchTab('session')">New Session</button>
+        <button class="tab-btn" id="tabGroup" onclick="switchTab('group')">New Group</button>
+    </div>
+
+    <div id="panelSession">
+
+        <% if (locals.error === 'session_limit') { %>
+        <div style="background:var(--blockquote-bg-color);border:1px solid var(--blockquote-border-color);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.88rem;">
+            You've reached the free plan limit of <%= locals.planLimits && locals.planLimits.sessions %> active sessions.<% if (locals.billingUrl && !locals.hideMonetization) { %> <a href="<%= locals.billingUrl %>" target="_blank" rel="noopener">Upgrade to Pro</a> for unlimited sessions.<% } %>
+        </div>
+        <% } %>
+        <% if (locals.error === 'group_limit') { %>
+        <div style="background:var(--blockquote-bg-color);border:1px solid var(--blockquote-border-color);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.88rem;">
+            You've reached the free plan limit of <%= locals.planLimits && locals.planLimits.groups %> groups.<% if (locals.billingUrl && !locals.hideMonetization) { %> <a href="<%= locals.billingUrl %>" target="_blank" rel="noopener">Upgrade to Pro</a> for unlimited groups.<% } %>
+        </div>
+        <% } %>
+
+        <% if (!locals.isFree) { %>
+        <div id="templateBar" style="margin-bottom:18px;display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--link-color);">Templates</span>
+                <button type="button" id="saveTemplateBtn" onclick="saveTemplate()" style="font-size:0.75rem;padding:4px 10px;background:transparent;border:1px solid var(--form-border-color);color:var(--text-color);">Save current</button>
+            </div>
+            <div id="templateList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+        <% } else if (locals.billingUrl && !locals.hideMonetization) { %>
+        <div style="margin-bottom:18px;padding:10px 14px;background:var(--blockquote-bg-color);border:1px solid var(--form-border-color);border-radius:8px;font-size:0.82rem;color:var(--text-color);display:flex;align-items:center;gap:8px;">
+            <span>Note:</span><span>Session templates are a <a href="<%= locals.billingUrl %>" target="_blank" rel="noopener">Pro</a> feature.</span>
+        </div>
+        <% } %>
+
+        <form method="POST" action="/add/session">
+            <div class="form-group">
+                <label for="sname">Session Name</label>
+                <input type="text" id="sname" name="name" placeholder="e.g. Study for midterm" required>
+            </div>
+
+            <div class="form-group">
+                <label for="sdate">Date &amp; Time</label>
+                <input type="datetime-local" id="sdate" name="date" required
+                    value="<%= locals.prefilledDate ? locals.prefilledDate + 'T09:00' : '' %>">
+            </div>
+
+            <div class="form-group">
+                <label for="sgroup">Group</label>
+                <select id="sgroup" name="groupId">
+                    <option value="">No Group</option>
+                    <% groups.forEach(function(g) { %>
+                    <option value="<%= g._id %>"><%= g.name %></option>
+                    <% }); %>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="sduration">Duration (minutes)</label>
+                <input type="number" id="sduration" name="duration" min="1" placeholder="e.g. 60, used for calendar export/sync">
+            </div>
+
+            <div class="form-group">
+                <label for="slocation">Location</label>
+                <input type="text" id="slocation" name="location" placeholder="Optional">
+            </div>
+
+            <div class="form-group">
+                <label for="sdescription">Description</label>
+                <textarea id="sdescription" name="description" rows="3" placeholder="Optional notes for this session"></textarea>
+            </div>
+
+            <div class="form-group task-builder">
+                <label>Tasks</label>
+                <div id="taskList"></div>
+                <div class="task-builder-input" style="margin-top:8px;">
+                    <input type="text" id="taskInput" placeholder="Add a task..." onkeydown="if(event.key==='Enter'){event.preventDefault();addTask();}">
+                    <input type="number" id="taskDurInput" placeholder="min" min="1" class="task-dur" title="Optional: estimated minutes for this task">
+                    <button type="button" onclick="addTask()">Add</button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:16px;text-align:center;">
+                <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" name="strictMode" value="on">
+                    <span>Strict Mode <span style="color:var(--link-color);font-size:0.85rem;">: can't skip or stop until all tasks are done</span></span>
+                </label>
+            </div>
+
+            <button type="submit" style="width: -webkit-fill-available;">Create Session</button>
+        </form>
+    </div>
+
+    <div id="panelGroup" style="display:none;">
+        <form method="POST" action="/add/group">
+            <div class="form-group">
+                <label for="gname">Group Name</label>
+                <input type="text" id="gname" name="name" placeholder="e.g. School, Work, Personal" required>
+            </div>
+
+            <div class="form-group">
+                <label for="gcolor">Color</label>
+                <input type="color" id="gcolor" name="color" value="#FF80CC" style="width:60px;height:40px;padding:2px;cursor:pointer;">
+            </div>
+
+            <button type="submit" style="width: -webkit-fill-available;">Create Group</button>
+        </form>
+
+        <% if (groups.length > 0) { %>
+        <div class="groups-list">
+            <div class="section-header">
+                <h2>Your Groups</h2>
+                <hr>
+            </div>
+            <% groups.forEach(function(g) { %>
+            <div class="group-item">
+                <span class="group-swatch" style="background-color: <%= g.color %>;"></span>
+                <span><%= g.name %></span>
+            </div>
+            <% }); %>
+        </div>
+        <% } %>
+    </div>
+</div>
+
+<script>
+    function switchTab(tab) {
+        document.getElementById('panelSession').style.display = tab === 'session' ? 'block' : 'none';
+        document.getElementById('panelGroup').style.display = tab === 'group' ? 'block' : 'none';
+        document.getElementById('tabSession').classList.toggle('active', tab === 'session');
+        document.getElementById('tabGroup').classList.toggle('active', tab === 'group');
+    }
+
+    function addTask() {
+        const nameInput = document.getElementById('taskInput');
+        const durInput = document.getElementById('taskDurInput');
+        const name = nameInput.value.trim();
+        if (!name) return;
+        const dur = durInput.value.trim();
+        appendTaskItem(document.getElementById('taskList'), name, dur);
+        nameInput.value = '';
+        durInput.value = '';
+        nameInput.focus();
+    }
+
+    function appendTaskItem(list, name, dur) {
+        const item = document.createElement('div');
+        item.className = 'task-item';
+        item.draggable = true;
+
+        const handle = document.createElement('span');
+        handle.className = 'drag-handle';
+        handle.textContent = '⠿';
+
+        const hiddenName = document.createElement('input');
+        hiddenName.type = 'hidden';
+        hiddenName.name = 'tasks';
+        hiddenName.value = name;
+
+        const hiddenDur = document.createElement('input');
+        hiddenDur.type = 'hidden';
+        hiddenDur.name = 'taskDurations';
+        hiddenDur.value = dur || '';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'task-name';
+        nameSpan.textContent = name;
+        nameSpan.style.flex = '1';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = 'x';
+        removeBtn.onclick = function() { item.remove(); };
+
+        item.appendChild(handle);
+        item.appendChild(hiddenName);
+        item.appendChild(hiddenDur);
+        item.appendChild(nameSpan);
+
+        if (dur) {
+            const durLabel = document.createElement('span');
+            durLabel.style.cssText = 'font-size:0.8rem;color:var(--link-color);flex-shrink:0;';
+            durLabel.textContent = dur + 'min';
+            item.appendChild(durLabel);
+        }
+
+        item.appendChild(removeBtn);
+        list.appendChild(item);
+    }
+
+    function initDragOnList(list) {
+        let dragSrc = null;
+        list.addEventListener('dragstart', e => {
+            dragSrc = e.target.closest('.task-item');
+            if (!dragSrc) return;
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => dragSrc.classList.add('dragging'), 0);
+        });
+        list.addEventListener('dragend', () => {
+            if (dragSrc) dragSrc.classList.remove('dragging');
+            dragSrc = null;
+        });
+        list.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!dragSrc) return;
+            const target = e.target.closest('.task-item');
+            if (!target || target === dragSrc) return;
+            const rect = target.getBoundingClientRect();
+            if (e.clientY < rect.top + rect.height / 2) {
+                list.insertBefore(dragSrc, target);
+            } else {
+                list.insertBefore(dragSrc, target.nextSibling);
+            }
+        });
+        list.addEventListener('drop', e => e.preventDefault());
+    }
+
+    initDragOnList(document.getElementById('taskList'));
+
+    if (!document.getElementById('sdate').value) {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('sdate').value = now.toISOString().slice(0, 16);
+    }
+
+    // ── Session Templates ──────────────────────────────────────────────────────
+    const TMPL_KEY = 'serenity-templates';
+
+    function getTemplates() {
+        try { return JSON.parse(localStorage.getItem(TMPL_KEY) || '[]'); } catch(e) { return []; }
+    }
+
+    function saveTemplates(list) {
+        localStorage.setItem(TMPL_KEY, JSON.stringify(list));
+    }
+
+    var TMPL_LIMIT = <%= (locals.planLimits && locals.planLimits.templates !== false) ? locals.planLimits.templates : 0 %>;
+
+    function saveTemplate() {
+        const name = document.getElementById('sname').value.trim();
+        if (!name) { alert('Add a session name first.'); return; }
+        const tasks = [];
+        document.querySelectorAll('#taskList .task-item').forEach(function(item) {
+            const n = item.querySelector('input[name="tasks"]');
+            const d = item.querySelector('input[name="taskDurations"]');
+            if (n && n.value.trim()) tasks.push({ name: n.value.trim(), duration: d ? d.value : '' });
+        });
+        const groupId = document.getElementById('sgroup').value;
+        const list = getTemplates();
+        const existing = list.findIndex(function(t) { return t.name === name; });
+        if (existing < 0 && TMPL_LIMIT !== Infinity && list.length >= TMPL_LIMIT) {
+            alert('You\'ve reached the ' + TMPL_LIMIT + '-template limit on the Pro plan. Delete a template to add another.');
+            return;
+        }
+        const tmpl = { name, tasks, groupId };
+        if (existing >= 0) list[existing] = tmpl; else list.push(tmpl);
+        saveTemplates(list);
+        renderTemplates();
+    }
+
+    function loadTemplate(tmpl) {
+        document.getElementById('sname').value = tmpl.name;
+        document.getElementById('sgroup').value = tmpl.groupId || '';
+        const taskList = document.getElementById('taskList');
+        taskList.innerHTML = '';
+        (tmpl.tasks || []).forEach(function(t) { appendTaskItem(taskList, t.name, t.duration); });
+    }
+
+    function deleteTemplate(name, e) {
+        e.stopPropagation();
+        const list = getTemplates().filter(function(t) { return t.name !== name; });
+        saveTemplates(list);
+        renderTemplates();
+    }
+
+    function renderTemplates() {
+        const list = getTemplates();
+        const bar  = document.getElementById('templateBar');
+        const container = document.getElementById('templateList');
+        if (!bar || !container) return;
+        bar.style.display = list.length > 0 ? 'block' : 'none';
+        container.innerHTML = '';
+        list.forEach(function(tmpl) {
+            const chip = document.createElement('div');
+            chip.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px 10px;background:var(--form-bg-color);border:1px solid var(--form-border-color);border-radius:20px;cursor:pointer;font-size:0.8rem;';
+            chip.title = 'Click to load';
+            chip.onclick = function() { loadTemplate(tmpl); };
+            const lbl = document.createElement('span');
+            lbl.textContent = tmpl.name;
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.textContent = 'x';
+            del.title = 'Delete template';
+            del.style.cssText = 'background:none;border:none;color:var(--link-color);cursor:pointer;font-size:0.75rem;padding:0 0 0 4px;line-height:1;';
+            del.onclick = function(e) { deleteTemplate(tmpl.name, e); };
+            chip.appendChild(lbl);
+            chip.appendChild(del);
+            container.appendChild(chip);
+        });
+    }
+
+    renderTemplates();
+</script>

@@ -1,0 +1,1070 @@
+<style>
+    .work-container {
+        max-width: 640px;
+        margin: 0 auto;
+        padding-bottom: 60px;
+    }
+
+    .session-header {
+        text-align: center;
+        margin-bottom: 28px;
+    }
+
+    .session-header h2 {
+        font-size: 1.6rem;
+        margin-bottom: 4px;
+    }
+
+    .session-header .group-label {
+        color: var(--link-color);
+        font-size: 0.95rem;
+    }
+
+    .music-notice {
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        background: var(--form-bg-color);
+        border: 1px solid var(--form-border-color);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        color: var(--link-color);
+    }
+
+    .music-notice a { color: var(--heading-color); }
+
+    #musicBar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: var(--form-bg-color);
+        border-top: 1px solid var(--form-border-color);
+        padding: 8px 24px;
+        display: none;
+        align-items: center;
+        gap: 12px;
+        z-index: 100;
+    }
+
+    #musicBar button {
+        background: none;
+        border: none;
+        color: var(--heading-color);
+        font-size: 1.3rem;
+        padding: 4px 8px;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    #musicBar button:hover { background: none; color: var(--link-color); }
+
+    #trackName {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.85rem;
+        color: var(--link-color);
+    }
+</style>
+
+<div class="work-container">
+
+    <%
+        const _nm = (workSession.name || '').match(/^\[(HIGH|LOW)\]\s*/);
+        const _cleanName = _nm ? workSession.name.slice(_nm[0].length) : workSession.name;
+        const _priority = _nm ? _nm[1] : null;
+    %>
+    <div class="session-header">
+        <h2>
+            <% if (_priority) { %><span class="priority-badge priority-<%= _priority.toLowerCase() %>"><%= _priority %></span> <% } %>
+            <%= _cleanName %>
+        </h2>
+        <p class="group-label">
+            <% if (group) { %>
+            <span class="group-dot" style="background-color:<%= group.color %>;"></span>
+            <%= group.name %>
+            <% } else { %>
+            No Group
+            <% } %>
+            &nbsp;&middot;&nbsp; <span id="taskCount"><%= workSession.tasks.length %></span> task<span id="taskCountS"><%= workSession.tasks.length !== 1 ? 's' : '' %></span>
+        </p>
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+            <a href="/work/<%= workSession._id %>/export.ics" style="font-size:0.78rem;padding:5px 11px;border:1px solid var(--form-border-color);border-radius:6px;color:var(--link-color);text-decoration:none;">⭳ Download .ics</a>
+            <a id="gcalLink" target="_blank" rel="noopener" href="#" style="font-size:0.78rem;padding:5px 11px;border:1px solid var(--form-border-color);border-radius:6px;color:var(--link-color);text-decoration:none;">+ Add to Google Calendar</a>
+        </div>
+    </div>
+
+    <!-- Stage 0: Setup -->
+    <div id="stage0" class="stage active">
+        <h3>Set Up Session</h3>
+
+        <!-- Music notice -->
+        <% if (!userPref || !userPref.musicService) { %>
+        <div class="music-notice">
+            <a href="/settings">Connect a music service</a> to play music during sessions.
+        </div>
+        <% } else if (userPref.musicService === 'spotify') { %>
+        <div class="music-notice">
+            Spotify:
+            <% if (userPref.musicPlaylistName) { %>
+            <strong><%= userPref.musicPlaylistName %></strong>
+            <% } else { %>
+            No playlist selected. <a href="/settings">Choose one →</a>
+            <% } %>
+        </div>
+        <% } else if (userPref.musicService === 'spotifyExternal' && userPref.spotifyExternalPlaylistId) { %>
+        <div class="music-notice">
+            Spotify playlist opens outside Serenity.
+            <a href="spotify:playlist:<%= userPref.spotifyExternalPlaylistId %>" title="Open in the Spotify app">Open Spotify app</a>
+            <span aria-hidden="true"> | </span>
+            <a href="https://open.spotify.com/playlist/<%= userPref.spotifyExternalPlaylistId %>" target="_blank" rel="noopener">Open Spotify web player</a>
+        </div>
+        <% } else if (userPref.musicService === 'applemusic') { %>
+        <div class="music-notice">
+            Apple Music:
+            <% if (userPref.musicPlaylistName) { %>
+            <strong><%= userPref.musicPlaylistName %></strong>
+            <% } else { %>
+            No playlist selected. <a href="/settings">Choose one →</a>
+            <% } %>
+        </div>
+        <% } else if (userPref.musicService === 'deezer') { %>
+        <div class="music-notice">
+            Deezer:
+            <% if (userPref.musicPlaylistName) { %>
+            <strong><%= userPref.musicPlaylistName %></strong>
+            <% } else { %>
+            No playlist selected. <a href="/settings">Choose one →</a>
+            <% } %>
+        </div>
+        <% } %>
+
+        <div class="mode-options">
+            <label class="mode-option">
+                <input type="radio" name="mode" value="consistent" checked onchange="onModeChange(this.value)">
+                <strong>Consistent</strong>
+                <p style="margin:6px 0 0;font-size:0.85rem;color:var(--link-color);">Same work/break duration each cycle</p>
+            </label>
+            <label class="mode-option">
+                <input type="radio" name="mode" value="taskbased" onchange="onModeChange(this.value)">
+                <strong>Task-Based</strong>
+                <p style="margin:6px 0 0;font-size:0.85rem;color:var(--link-color);">One task per work cycle</p>
+            </label>
+        </div>
+
+        <div id="consistentOptions">
+            <div class="duration-inputs">
+                <div class="form-group">
+                    <label>Work (minutes)</label>
+                    <input type="number" id="workMin" value="<%= userPref ? userPref.defaultWorkDuration : 25 %>" min="1" max="180">
+                </div>
+                <div class="form-group">
+                    <label>Break (minutes)</label>
+                    <input type="number" id="breakMin" value="<%= userPref ? userPref.defaultBreakDuration : 5 %>" min="1" max="60">
+                </div>
+            </div>
+        </div>
+
+        <div id="taskbasedOptions" style="display:none;">
+            <div class="duration-inputs">
+                <div class="form-group">
+                    <label>Default time per task (minutes)</label>
+                    <input type="number" id="taskMin" value="<%= userPref ? userPref.defaultWorkDuration : 25 %>" min="1" max="180">
+                </div>
+                <div class="form-group">
+                    <label>Break (minutes)</label>
+                    <input type="number" id="breakMin2" value="<%= userPref ? userPref.defaultBreakDuration : 5 %>" min="1" max="60">
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+            <p style="color:var(--link-color);font-size:0.9rem;margin-bottom:8px;">Tasks</p>
+            <div id="setupTaskList"></div>
+            <div class="task-builder-input" style="margin-top:8px;">
+                <input type="text" id="setupTaskInput" placeholder="Add a task..." onkeydown="if(event.key==='Enter'){event.preventDefault();addSetupTask();}">
+                <input type="number" id="setupTaskDur" placeholder="min" min="1" class="task-dur" title="Optional: estimated minutes for this task">
+                <button type="button" onclick="addSetupTask()">Add</button>
+            </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;background:var(--form-bg-color);border:1px solid var(--form-border-color);border-radius:8px;">
+                <input type="checkbox" id="strictModeToggle" <%= workSession.strictMode ? 'checked' : '' %> onchange="strictMode = this.checked">
+                <span><strong>Strict Mode</strong><span style="color:var(--link-color);font-size:0.85rem;display:block;">Can't skip to break or stop until all tasks are done</span></span>
+            </label>
+        </div>
+
+        <button onclick="beginSession()" style="width:-webkit-fill-available;">Begin Session</button>
+    </div>
+
+    <!-- Stage 1: Working -->
+    <div id="stage1" class="stage">
+        <div class="timer-container">
+            <p class="timer-label" id="workLabel">Working</p>
+            <p id="currentTaskLabel" style="color:var(--heading-color);font-size:1rem;margin-bottom:16px;display:none;"></p>
+            <div class="timer-display" id="workTimer">25:00</div>
+            <div style="display:flex;gap:10px;margin-top:24px;justify-content:center;flex-wrap:wrap;">
+                <button onclick="skipToBreak()" id="skipBreakBtn">Take Break Early</button>
+                <button onclick="stopSession()" id="stopBtn" style="background:transparent;border:1px solid var(--form-border-color);color:var(--text-color);">Stop Session</button>
+            </div>
+        </div>
+        <div id="workTasksPanel" style="display:none;margin-top:18px;padding:14px 16px;background:var(--form-bg-color);border:1px solid var(--form-border-color);border-radius:8px;">
+            <p style="font-size:0.72rem;color:var(--link-color);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">Tasks &mdash; <span style="font-weight:normal;text-transform:none;letter-spacing:normal;opacity:0.75;">check them off during a break</span></p>
+            <div id="workTaskList"></div>
+        </div>
+        <div id="focusLinksPanel1" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- Stage 2: Break -->
+    <div id="stage2" class="stage">
+        <div class="timer-container">
+            <p class="timer-label">Break</p>
+            <div class="timer-display" id="breakTimer">05:00</div>
+        </div>
+
+        <p style="color:var(--link-color);font-size:0.9rem;margin-bottom:10px;display:none;" id="breakTasksLabel">Check off completed tasks:</p>
+        <div id="breakTaskList"></div>
+
+        <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+            <button onclick="skipBreak()" style="flex:1;" id="skipBreakBtn2">Skip Break</button>
+            <button onclick="finishSession()" style="flex:1;background-color:var(--button-hover-bg-color);">Finish Session</button>
+            <button onclick="stopSession()" style="flex:1;background:transparent;border:1px solid var(--form-border-color);color:var(--text-color);">Stop</button>
+        </div>
+        <div id="focusLinksPanel2" style="margin-top:20px;"></div>
+    </div>
+
+    <!-- Stage 3: Complete -->
+    <div id="stage3" class="stage">
+        <div style="text-align:center;padding:40px 0;">
+            <h2>Session Complete</h2>
+            <p style="color:var(--link-color);margin-bottom:32px;" id="completeSummary"></p>
+
+            <form method="POST" action="/work/<%= workSession._id %>/complete" id="completeForm">
+                <button type="submit" style="width:-webkit-fill-available;margin-bottom:12px;">Mark as Done &amp; Return Home</button>
+            </form>
+            <button onclick="window.location.href='/home'" style="width:-webkit-fill-available;background-color:transparent;border:1px solid var(--form-border-color);color:var(--text-color);">Return Home Without Saving</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- Fixed music control bar -->
+<div id="musicBar">
+    <button onclick="musicPrev()" title="Previous">⏮</button>
+    <button onclick="musicPlayPause()" id="playPauseBtn" title="Play/Pause">⏸</button>
+    <button onclick="musicNext()" title="Next">⏭</button>
+    <span id="trackName"></span>
+    <button onclick="document.getElementById('musicBar').style.display='none'" title="Hide" style="font-size:0.85rem;opacity:0.55;">Close</button>
+</div>
+
+<!-- SDK script tags (conditional per service) -->
+<% if (userPref && userPref.musicService === 'spotify' && userPref.musicPlaylistId) { %>
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
+<% } %>
+<% if (userPref && userPref.musicService === 'applemusic' && userPref.appleMusicUserToken && userPref.musicPlaylistId) { %>
+<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" data-web-components async></script>
+<% } %>
+
+<!-- Hidden Deezer player container -->
+<% if (userPref && userPref.musicService === 'deezer' && userPref.musicPlaylistId) { %>
+<div id="dzWorkPlayer" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;"></div>
+<script src="https://e-cdns-files.dzcdn.net/js/min/dz.js"></script>
+<% } %>
+
+<script>
+    const workSessionData = <%- workSessionJson %>;
+    let tasks = workSessionData.tasks || [];
+
+    // ── Add to Google Calendar link ─────────────────────────────────────────────
+    (function () {
+        function sessionDurationMinutes(s) {
+            if (s.duration) return s.duration;
+            const total = (s.tasks || []).reduce((sum, t) => sum + (t.duration || 0), 0);
+            return total > 0 ? total : 30;
+        }
+        function gcalStamp(d) {
+            const pad = n => String(n).padStart(2, '0');
+            return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' +
+                pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + 'Z';
+        }
+        const start = new Date(workSessionData.date);
+        const end = new Date(start.getTime() + sessionDurationMinutes(workSessionData) * 60000);
+        const details = [];
+        if (workSessionData.description) details.push(workSessionData.description);
+        <% if (group) { %>details.push('Group: <%= group.name.replace(/'/g, "\\'") %>');<% } %>
+        if ((workSessionData.tasks || []).length) details.push('Tasks: ' + workSessionData.tasks.map(t => t.name).join(', '));
+        const params = new URLSearchParams({
+            action: 'TEMPLATE',
+            text: workSessionData.name || 'Untitled Session',
+            dates: gcalStamp(start) + '/' + gcalStamp(end),
+            details: details.join('\n'),
+            location: workSessionData.location || ''
+        });
+        const link = document.getElementById('gcalLink');
+        if (link) link.href = 'https://www.google.com/calendar/render?' + params.toString();
+    })();
+
+    let strictMode = <%= workSession.strictMode ? 'true' : 'false' %>;
+    window.__blacklistedUrls = <%- JSON.stringify((userPref && userPref.blacklistedApps || []).map(function(a){ return a.url; })) %>;
+
+    let mode = 'consistent';
+    let workDuration = <%= userPref ? userPref.defaultWorkDuration : 25 %>;
+    let breakDuration = <%= userPref ? userPref.defaultBreakDuration : 5 %>;
+    let taskDuration = <%= userPref ? userPref.defaultWorkDuration : 25 %>;
+    let timerInterval = null;
+    let secondsLeft = 0;
+    let cycleCount = 0;
+    const checkedTasks = new Set();
+
+    // ── Music interface (defaults, overridden below per service) ─────────────
+    let startMusic = async () => {};
+    let musicPlayPause = () => {};
+    let musicNext = () => {};
+    let musicPrev = () => {};
+
+    <% if (userPref && userPref.musicService === 'spotify' && userPref.musicPlaylistId) { %>
+    // ── Spotify ───────────────────────────────────────────────────────────────
+    let _spotifyPlayer = null;
+    let _spotifyDeviceId = null;
+    const _spotifyPlaylistUri = 'spotify:playlist:<%= userPref.musicPlaylistId %>';
+
+    async function _getSpotifyToken() {
+        const res = await fetch('/api/spotify/token');
+        return (await res.json()).token;
+    }
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+        _spotifyPlayer = new Spotify.Player({
+            name: 'Serenity Focus Timer',
+            getOAuthToken: async cb => { cb(await _getSpotifyToken()); },
+            volume: 0.7
+        });
+        _spotifyPlayer.addListener('ready', ({ device_id }) => { _spotifyDeviceId = device_id; });
+        _spotifyPlayer.addListener('player_state_changed', state => {
+            if (!state) return;
+            document.getElementById('playPauseBtn').textContent = state.paused ? '▶' : '⏸';
+            const track = state.track_window && state.track_window.current_track;
+            if (track) document.getElementById('trackName').textContent = track.name + ' by ' + track.artists.map(a => a.name).join(', ');
+        });
+        _spotifyPlayer.connect();
+    };
+
+    startMusic = async function() {
+        if (!_spotifyDeviceId) return;
+        const token = await _getSpotifyToken();
+        await fetch('https://api.spotify.com/v1/me/player/play?device_id=' + _spotifyDeviceId, {
+            method: 'PUT',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ context_uri: _spotifyPlaylistUri })
+        });
+        document.getElementById('musicBar').style.display = 'flex';
+    };
+    musicPlayPause = function() { if (_spotifyPlayer) _spotifyPlayer.togglePlay(); };
+    musicNext = function() { if (_spotifyPlayer) _spotifyPlayer.nextTrack(); };
+    musicPrev = function() { if (_spotifyPlayer) _spotifyPlayer.previousTrack(); };
+
+    <% } else if (userPref && userPref.musicService === 'applemusic' && userPref.appleMusicUserToken && userPref.musicPlaylistId) { %>
+    // ── Apple Music ───────────────────────────────────────────────────────────
+    let _amInstance = null;
+    const _amPlaylistId = '<%= userPref.musicPlaylistId %>';
+
+    async function _initAppleMusic() {
+        const res = await fetch('/api/applemusic/developer-token');
+        if (!res.ok) throw new Error('Could not get developer token');
+        const { token } = await res.json();
+        await MusicKit.configure({ developerToken: token, app: { name: 'Serenity', build: '1.0.0' } });
+        _amInstance = MusicKit.getInstance();
+        _amInstance.addEventListener('playbackStateDidChange', () => {
+            const playing = _amInstance.playbackState === MusicKit.PlaybackStates.playing;
+            document.getElementById('playPauseBtn').textContent = playing ? '⏸' : '▶';
+        });
+        _amInstance.addEventListener('nowPlayingItemDidChange', () => {
+            const item = _amInstance.nowPlayingItem;
+            if (item) document.getElementById('trackName').textContent = item.title + ' by ' + item.artistName;
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => { _initAppleMusic().catch(() => {}); });
+
+    startMusic = async function() {
+        if (!_amInstance) await _initAppleMusic();
+        if (!_amInstance.isAuthorized) await _amInstance.authorize();
+        await _amInstance.setQueue({ playlist: _amPlaylistId });
+        await _amInstance.play();
+        document.getElementById('musicBar').style.display = 'flex';
+    };
+    musicPlayPause = function() {
+        if (!_amInstance) return;
+        if (_amInstance.playbackState === MusicKit.PlaybackStates.playing) {
+            _amInstance.pause().catch(() => {});
+        } else {
+            _amInstance.play().catch(() => {});
+        }
+    };
+    musicNext = function() { if (_amInstance) _amInstance.skipToNextItem().catch(() => {}); };
+    musicPrev = function() { if (_amInstance) _amInstance.skipToPreviousItem().catch(() => {}); };
+
+    <% } else if (userPref && userPref.musicService === 'deezer' && userPref.musicPlaylistId) { %>
+    // ── Deezer ────────────────────────────────────────────────────────────────
+    const _deezerPlaylistId = parseInt('<%= userPref.musicPlaylistId %>', 10);
+    let _deezerReady = false;
+    let _deezerPlaying = false;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        DZ.init({
+            appId: '<%= process.env.DEEZER_APP_ID || "" %>',
+            channelUrl: window.location.origin + '/deezer/channel',
+            player: {
+                container: 'dzWorkPlayer',
+                width: 0,
+                height: 0,
+                onload: () => { _deezerReady = true; }
+            }
+        });
+        DZ.Event.subscribe('player_paused', () => {
+            _deezerPlaying = false;
+            document.getElementById('playPauseBtn').textContent = '▶';
+        });
+        DZ.Event.subscribe('player_resumed', () => {
+            _deezerPlaying = true;
+            document.getElementById('playPauseBtn').textContent = '⏸';
+        });
+        DZ.Event.subscribe('current_track', data => {
+            _deezerPlaying = true;
+            document.getElementById('playPauseBtn').textContent = '⏸';
+            if (data.track) document.getElementById('trackName').textContent = data.track.title + ' by ' + data.track.artist.name;
+        });
+    });
+
+    startMusic = async function() {
+        await new Promise((resolve, reject) => {
+            DZ.login(response => {
+                if (response.authResponse) resolve();
+                else reject(new Error('Deezer login cancelled'));
+            }, { perms: 'basic_access,manage_library' });
+        });
+        DZ.player.playPlaylist(_deezerPlaylistId, true, 0, 0);
+        document.getElementById('musicBar').style.display = 'flex';
+    };
+    musicPlayPause = function() {
+        if (_deezerPlaying) { DZ.player.pause(); } else { DZ.player.play(); }
+    };
+    musicNext = function() { DZ.player.next(); };
+    musicPrev = function() { DZ.player.prev(); };
+
+    <% } %>
+
+    // ── Setup task list ───────────────────────────────────────────────────────
+    function buildSetupTaskList() {
+        const list = document.getElementById('setupTaskList');
+        list.innerHTML = '';
+        tasks.forEach(task => list.appendChild(createSetupTaskItem(task)));
+        initDragOnList(list);
+    }
+
+    function createSetupTaskItem(task) {
+        const item = document.createElement('div');
+        item.className = 'task-item';
+        item.draggable = true;
+        item.dataset.id = task._id ? String(task._id) : '';
+
+        const handle = document.createElement('span');
+        handle.className = 'drag-handle';
+        handle.textContent = '⠿';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'task-name-input';
+        nameInput.value = task.name;
+
+        const durInput = document.createElement('input');
+        durInput.type = 'number';
+        durInput.className = 'task-dur task-dur-input';
+        durInput.value = task.duration || '';
+        durInput.placeholder = 'min';
+        durInput.min = '1';
+        durInput.title = 'Estimated minutes for this task';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = 'x';
+        removeBtn.onclick = () => item.remove();
+
+        item.appendChild(handle);
+        item.appendChild(nameInput);
+        item.appendChild(durInput);
+        item.appendChild(removeBtn);
+        return item;
+    }
+
+    function addSetupTask() {
+        const nameInput = document.getElementById('setupTaskInput');
+        const durInput = document.getElementById('setupTaskDur');
+        const name = nameInput.value.trim();
+        if (!name) return;
+        const dur = durInput.value ? parseInt(durInput.value) : null;
+        document.getElementById('setupTaskList').appendChild(
+            createSetupTaskItem({ name, duration: dur })
+        );
+        nameInput.value = '';
+        durInput.value = '';
+        nameInput.focus();
+    }
+
+    // ── Drag and drop ─────────────────────────────────────────────────────────
+    function initDragOnList(list) {
+        let dragSrc = null;
+        list.addEventListener('dragstart', e => {
+            dragSrc = e.target.closest('.task-item');
+            if (!dragSrc) return;
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => dragSrc.classList.add('dragging'), 0);
+        });
+        list.addEventListener('dragend', () => {
+            if (dragSrc) dragSrc.classList.remove('dragging');
+            dragSrc = null;
+        });
+        list.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!dragSrc) return;
+            const target = e.target.closest('.task-item');
+            if (!target || target === dragSrc) return;
+            const rect = target.getBoundingClientRect();
+            if (e.clientY < rect.top + rect.height / 2) {
+                list.insertBefore(dragSrc, target);
+            } else {
+                list.insertBefore(dragSrc, target.nextSibling);
+            }
+        });
+        list.addEventListener('drop', e => e.preventDefault());
+    }
+
+    // ── Session control ───────────────────────────────────────────────────────
+    function onModeChange(val) {
+        mode = val;
+        document.getElementById('consistentOptions').style.display = mode === 'consistent' ? 'block' : 'none';
+        document.getElementById('taskbasedOptions').style.display = mode === 'taskbased' ? 'block' : 'none';
+    }
+
+    function showStage(n) {
+        document.querySelectorAll('.stage').forEach(el => {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        });
+        const el = document.getElementById('stage' + n);
+        el.style.display = 'block';
+        el.classList.add('active');
+    }
+
+    async function beginSession() {
+        // Collect tasks from setup UI
+        const updatedTasks = [];
+        document.querySelectorAll('#setupTaskList .task-item').forEach(item => {
+            const nameEl = item.querySelector('.task-name-input');
+            const durEl = item.querySelector('.task-dur-input');
+            const name = nameEl ? nameEl.value.trim() : '';
+            if (!name) return;
+            const origId = item.dataset.id;
+            const origTask = origId ? tasks.find(t => String(t._id) === origId) : null;
+            updatedTasks.push({
+                _id: origId || undefined,
+                name,
+                duration: durEl && durEl.value ? parseInt(durEl.value) : null,
+                done: origTask ? origTask.done : false
+            });
+        });
+
+        // Save changes to server
+        try {
+            const res = await fetch('/work/<%= workSession._id %>/tasks', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tasks: updatedTasks })
+            });
+            const data = await res.json();
+            tasks = data.tasks || updatedTasks;
+        } catch(e) {
+            tasks = updatedTasks;
+        }
+
+        // Update header task count
+        document.getElementById('taskCount').textContent = tasks.length;
+        document.getElementById('taskCountS').textContent = tasks.length !== 1 ? 's' : '';
+
+        // Get duration settings
+        if (mode === 'consistent') {
+            workDuration = parseInt(document.getElementById('workMin').value) || 25;
+            breakDuration = parseInt(document.getElementById('breakMin').value) || 5;
+        } else {
+            taskDuration = parseInt(document.getElementById('taskMin').value) || 25;
+            breakDuration = parseInt(document.getElementById('breakMin2').value) || 5;
+        }
+
+        // Auto-open floating timer while user gesture is still active
+        if (window.documentPictureInPicture) {
+            togglePip().catch(function() {});
+        }
+
+        // Enter fullscreen to prevent distractions
+        try { await document.documentElement.requestFullscreen(); } catch(e) {}
+
+        // Start music
+        startMusic().catch(() => {});
+
+        renderFocusPanel();
+        startWork();
+    }
+
+    function startWork() {
+        showStage(1);
+        if (_pipLabelEl) _pipLabelEl.textContent = 'Working';
+        buildWorkTaskList();
+
+        if (mode === 'taskbased' && tasks.length > 0) {
+            const remaining = tasks.filter(t => !checkedTasks.has(String(t._id)));
+            if (remaining.length === 0) { finishSession(); return; }
+            const current = remaining[0];
+            const dur = (current.duration && current.duration > 0) ? current.duration : taskDuration;
+            secondsLeft = dur * 60;
+            const durNote = current.duration ? ' (' + current.duration + 'min)' : '';
+            document.getElementById('currentTaskLabel').textContent = current.name + durNote;
+            document.getElementById('currentTaskLabel').style.display = 'block';
+            document.getElementById('workLabel').textContent = 'Working';
+        } else {
+            document.getElementById('currentTaskLabel').style.display = 'none';
+            secondsLeft = workDuration * 60;
+            document.getElementById('workLabel').textContent = 'Working';
+        }
+
+        startTimer('workTimer', () => { _notify('Time for a break!', 'Work interval complete.'); startBreak(); });
+    }
+
+    function startBreak() {
+        cycleCount++;
+        showStage(2);
+        if (_pipLabelEl) _pipLabelEl.textContent = 'Break';
+        buildBreakTaskList();
+        secondsLeft = breakDuration * 60;
+        startTimer('breakTimer', () => {
+            if (_allTasksDone()) finishSession();
+            else { _notify('Break over!', 'Ready for the next work interval?'); startWork(); }
+        });
+    }
+
+    function startTimer(displayId, onDone) {
+        clearInterval(timerInterval);
+        updateTimerDisplay(displayId);
+        timerInterval = setInterval(() => {
+            secondsLeft--;
+            updateTimerDisplay(displayId);
+            if (secondsLeft <= 0) {
+                clearInterval(timerInterval);
+                onDone();
+            }
+        }, 1000);
+    }
+
+    function updateTimerDisplay(id) {
+        const min = Math.floor(secondsLeft / 60).toString().padStart(2, '0');
+        const sec = (secondsLeft % 60).toString().padStart(2, '0');
+        const timeStr = min + ':' + sec;
+        document.getElementById(id).textContent = timeStr;
+        document.title = timeStr + ' - Serenity';
+        if (_pipTimerEl) _pipTimerEl.textContent = timeStr;
+    }
+
+    function buildBreakTaskList() {
+        const container = document.getElementById('breakTaskList');
+        const label = document.getElementById('breakTasksLabel');
+        if (!container) return;
+        container.innerHTML = '';
+        if (label) label.style.display = tasks.length > 0 ? 'block' : 'none';
+        tasks.forEach((task, i) => {
+            const div = document.createElement('div');
+            div.className = 'work-task-item' + (checkedTasks.has(String(task._id)) ? ' done' : '');
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.id = 'btask_' + i;
+            cb.checked = checkedTasks.has(String(task._id));
+            cb.onchange = function() { toggleTask(String(task._id), this.checked); };
+
+            const lbl = document.createElement('label');
+            lbl.htmlFor = 'btask_' + i;
+            lbl.textContent = task.name;
+            lbl.style.flex = '1';
+            lbl.style.cursor = 'pointer';
+
+            div.appendChild(cb);
+            div.appendChild(lbl);
+            container.appendChild(div);
+        });
+    }
+
+    function buildWorkTaskList() {
+        var panel = document.getElementById('workTasksPanel');
+        var container = document.getElementById('workTaskList');
+        if (!panel || !container) return;
+        container.innerHTML = '';
+        if (tasks.length === 0) { panel.style.display = 'none'; return; }
+        panel.style.display = 'block';
+        tasks.forEach(function(task) {
+            var div = document.createElement('div');
+            var done = checkedTasks.has(String(task._id));
+            div.style.cssText = 'display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--form-border-color);' +
+                (done ? 'opacity:0.38;' : '');
+            var dot = document.createElement('span');
+            dot.style.cssText = 'width:6px;height:6px;border-radius:50%;flex-shrink:0;' +
+                (done ? 'background:var(--link-color);' : 'border:1.5px solid var(--link-color);background:transparent;');
+            var nameSpan = document.createElement('span');
+            nameSpan.style.cssText = 'flex:1;font-size:0.88rem;' + (done ? 'text-decoration:line-through;' : '');
+            nameSpan.textContent = task.name;
+            div.appendChild(dot);
+            div.appendChild(nameSpan);
+            if (task.duration) {
+                var dur = document.createElement('span');
+                dur.style.cssText = 'font-size:0.73rem;color:var(--link-color);flex-shrink:0;';
+                dur.textContent = task.duration + 'm';
+                div.appendChild(dur);
+            }
+            container.appendChild(div);
+        });
+        var items = container.querySelectorAll('div');
+        if (items.length > 0) items[items.length - 1].style.borderBottom = 'none';
+    }
+
+    function toggleTask(id, checked) {
+        if (checked) checkedTasks.add(id);
+        else checkedTasks.delete(id);
+        buildBreakTaskList();
+        if (tasks.length > 0 && checkedTasks.size >= tasks.length) {
+            clearInterval(timerInterval);
+            finishSession();
+        }
+    }
+
+    function _allTasksDone() {
+        return tasks.length === 0 || checkedTasks.size >= tasks.length;
+    }
+
+    function stopSession() {
+        if (strictMode && !_allTasksDone()) {
+            alert('Complete all tasks before stopping the session.');
+            return;
+        }
+        if (confirm('Stop session? Your completed tasks will be saved.')) {
+            clearInterval(timerInterval);
+            finishSession();
+        }
+    }
+
+    function skipToBreak() {
+        if (strictMode && !_allTasksDone()) {
+            alert('Complete all tasks before taking an early break.');
+            return;
+        }
+        clearInterval(timerInterval);
+        startBreak();
+    }
+
+    function skipBreak() {
+        if (strictMode && !_allTasksDone()) {
+            alert('Complete all tasks before skipping the break.');
+            return;
+        }
+        clearInterval(timerInterval);
+        if (_allTasksDone()) finishSession();
+        else startWork();
+    }
+
+    function finishSession() {
+        clearInterval(timerInterval);
+        document.title = 'Serenity';
+        showStage(3);
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        document.getElementById('musicBar').style.display = 'none';
+
+        const doneCount = checkedTasks.size;
+        const totalCount = tasks.length;
+        document.getElementById('completeSummary').textContent =
+            totalCount > 0
+                ? doneCount + ' of ' + totalCount + ' tasks completed across ' + cycleCount + ' cycle' + (cycleCount !== 1 ? 's' : '') + '.'
+                : cycleCount + ' cycle' + (cycleCount !== 1 ? 's' : '') + ' completed.';
+
+        const form = document.getElementById('completeForm');
+        checkedTasks.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'completedTasks';
+            input.value = id;
+            form.appendChild(input);
+        });
+    }
+
+    // ── Browser notifications ──────────────────────────────────────────────────
+    function _requestNotifPerms() {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }
+
+    function _notify(title, body) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        try {
+            var n = new Notification(title, { body: body, tag: 'serenity-timer', silent: false });
+            setTimeout(function() { n.close(); }, 8000);
+        } catch(e) {}
+    }
+
+    // Build setup task list on load
+    buildSetupTaskList();
+    // Request notification permission early so it doesn't disrupt fullscreen later
+    _requestNotifPerms();
+
+    // ── Focus Links panel ────────────────────────────────────────────────────
+
+    let _localWhitelist = <%- JSON.stringify((userPref && userPref.whitelistedApps) || []) %>;
+    const _openedWindows = new Map();
+    let _pipWindow = null;
+    let _pipTimerEl = null;
+    let _pipLabelEl = null;
+
+    const POPULAR_APPS = [
+        { name: 'Spotify',  uri: 'spotify:'   },
+        { name: 'VS Code',  uri: 'vscode:'    },
+        { name: 'Slack',    uri: 'slack:'     },
+        { name: 'Discord',  uri: 'discord:'   },
+        { name: 'Notion',   uri: 'notion:'    },
+        { name: 'Zoom',     uri: 'zoommtg:'   },
+        { name: 'Figma',    uri: 'figma:'     },
+        { name: 'Obsidian', uri: 'obsidian:'  },
+    ];
+
+    function openOrFocus(url) {
+        if (!url) return;
+        // Custom protocol URIs (spotify:, vscode:, etc.)
+        if (!/^https?:\/\//i.test(url)) { window.open(url, '_blank'); return; }
+        // Ask any Serenity tab at this URL to focus itself
+        if (window._serenityBroadcast) {
+            window._serenityBroadcast.postMessage({ type: 'focus', url: url });
+        }
+        const existing = _openedWindows.get(url);
+        if (existing && !existing.closed) { try { existing.focus(); } catch(e) {} return; }
+        _openedWindows.set(url, window.open(url, '_blank'));
+    }
+
+    async function togglePip() {
+        // Close existing PiP window
+        if (_pipWindow && !_pipWindow.closed) {
+            _pipWindow.close();
+            _pipWindow = null; _pipTimerEl = null; _pipLabelEl = null;
+            return;
+        }
+        if (!window.documentPictureInPicture) return;
+        try {
+            _pipWindow = await window.documentPictureInPicture.requestWindow({ width: 200, height: 120 });
+            const cs = getComputedStyle(document.documentElement);
+            const bg  = cs.getPropertyValue('--background-color').trim() || '#1a0a1a';
+            const fg  = cs.getPropertyValue('--heading-color').trim()    || '#FF80CC';
+            const sub = cs.getPropertyValue('--link-color').trim()       || '#c080cc';
+            _pipWindow.document.documentElement.style.cssText = 'height:100%;margin:0;';
+            _pipWindow.document.body.style.cssText =
+                'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+                'height:100%;margin:0;gap:6px;background:' + bg + ';font-family:monospace;';
+            _pipLabelEl = _pipWindow.document.createElement('p');
+            _pipLabelEl.style.cssText = 'font-size:11px;font-family:sans-serif;text-transform:uppercase;letter-spacing:0.1em;margin:0;color:' + sub + ';';
+            _pipLabelEl.textContent = document.getElementById('workLabel')
+                ? document.getElementById('workLabel').textContent
+                : (document.getElementById('stage2') && document.getElementById('stage2').style.display !== 'none' ? 'Break' : 'Working');
+            _pipTimerEl = _pipWindow.document.createElement('div');
+            _pipTimerEl.style.cssText = 'font-size:3rem;line-height:1;color:' + fg + ';';
+            const activeTimer = document.getElementById('workTimer') || document.getElementById('breakTimer');
+            _pipTimerEl.textContent = activeTimer ? activeTimer.textContent : '00:00';
+            _pipWindow.document.body.appendChild(_pipLabelEl);
+            _pipWindow.document.body.appendChild(_pipTimerEl);
+            _pipWindow.addEventListener('pagehide', function() {
+                _pipWindow = null; _pipTimerEl = null; _pipLabelEl = null;
+                try { window.focus(); } catch(e) {}
+                var s1 = document.getElementById('stage1');
+                var s2 = document.getElementById('stage2');
+                if ((s1 && s1.classList.contains('active')) || (s2 && s2.classList.contains('active'))) {
+                    document.documentElement.requestFullscreen().catch(function() {});
+                }
+            });
+        } catch(e) { _pipWindow = null; }
+    }
+
+    function getOpenTabs() {
+        return new Promise(function(resolve) {
+            var tabs = new Map();
+            // Windows we opened via openOrFocus()
+            _openedWindows.forEach(function(win, url) {
+                if (!win.closed) tabs.set(url, { url: url, title: url });
+            });
+            if (!window.BroadcastChannel) return resolve([...tabs.values()]);
+            var bc = new BroadcastChannel('serenity-tabs');
+            bc.onmessage = function(e) {
+                if (e.data.type === 'tab' && e.data.url && e.data.url !== location.href) {
+                    tabs.set(e.data.url, { url: e.data.url, title: e.data.title || e.data.url });
+                }
+            };
+            bc.postMessage({ type: 'query' });
+            setTimeout(function() { bc.close(); resolve([...tabs.values()]); }, 400);
+        });
+    }
+
+    function _makeFocusCard(typeLabel, name, url, highlighted) {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.title = name + (url ? '\n' + url : '');
+        a.onclick = function(e) { e.preventDefault(); openOrFocus(url); };
+        a.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+            'width:72px;height:72px;border-radius:14px;text-decoration:none;gap:4px;padding:6px;cursor:pointer;' +
+            (highlighted
+                ? 'background:var(--button-bg-color);'
+                : 'background:var(--form-bg-color);border:1px solid var(--form-border-color);');
+        const icon = document.createElement('span');
+        icon.style.cssText = 'font-size:1.4rem;line-height:1;';
+        icon.textContent = typeLabel;
+        const lbl = document.createElement('span');
+        lbl.style.cssText = 'font-size:0.62rem;text-align:center;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;' + (highlighted ? 'color:#fff;' : '');
+        lbl.textContent = name;
+        a.appendChild(icon); a.appendChild(lbl);
+        return a;
+    }
+
+    function _isBlocked(url) {
+        const blocked = window.__blacklistedUrls || [];
+        if (!url || !blocked.length) return false;
+        const sn = url.replace(/^https?:\/\//i, '').split('/')[0];
+        return blocked.some(function(b) {
+            const bn = b.replace(/^https?:\/\//i, '').split('/')[0];
+            return bn && sn && bn === sn;
+        });
+    }
+
+    async function renderFocusPanel() {
+        const openTabs = await getOpenTabs();
+
+        function _tabName(t) {
+            if (t.title && t.title !== t.url) return t.title.replace(/ ?[-] ?Serenity$/i, '').replace(/^Serenity [-] /i, '');
+            try { return new URL(t.url).hostname.replace('www.', ''); } catch(e) { return t.url; }
+        }
+
+        function populate(container) {
+            container.style.cssText = 'padding:12px 16px;background:var(--form-bg-color);border:1px solid var(--form-border-color);border-radius:8px;';
+            container.innerHTML = '';
+
+            const hdr = document.createElement('p');
+            hdr.style.cssText = 'font-size:0.75rem;color:var(--link-color);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.07em;';
+            hdr.textContent = 'Focus Links';
+            container.appendChild(hdr);
+
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;';
+
+            // Whitelisted apps first (highlighted)
+            _localWhitelist.forEach(function(app) {
+                row.appendChild(_makeFocusCard(app.appType === 'app' ? 'APP' : 'WEB', app.name, app.url, true));
+            });
+
+            // Open tabs that aren't blocked and aren't already in the whitelist
+            const whitelistUrls = new Set(_localWhitelist.map(function(a) { return a.url; }));
+            const others = openTabs.filter(function(t) {
+                return !_isBlocked(t.url) && !whitelistUrls.has(t.url);
+            });
+
+            if (_localWhitelist.length > 0 && others.length > 0) {
+                const divider = document.createElement('div');
+                divider.style.cssText = 'width:100%;height:1px;background:var(--form-border-color);margin:2px 0;';
+                row.appendChild(divider);
+            }
+
+            others.forEach(function(tab) {
+                row.appendChild(_makeFocusCard('TAB', _tabName(tab), tab.url, false));
+            });
+
+            // Quick-add card
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.title = 'Add to focus links';
+            addBtn.style.cssText = 'width:72px;height:72px;border-radius:14px;border:1px dashed var(--form-border-color);background:none;color:var(--link-color);font-size:1.6rem;cursor:pointer;display:flex;align-items:center;justify-content:center;';
+            addBtn.textContent = '+';
+            addBtn.onclick = showQuickAdd;
+            row.appendChild(addBtn);
+
+            container.appendChild(row);
+        }
+
+        ['focusLinksPanel1', 'focusLinksPanel2'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el) populate(el);
+        });
+    }
+
+    // Refresh the panel when the user comes back to this tab (a new tab may have opened)
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) renderFocusPanel();
+    });
+
+    function showQuickAdd() {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML = `
+            <div style="background:var(--form-bg-color);border:1px solid var(--form-border-color);border-radius:14px;padding:24px;width:330px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+                <h3 style="margin:0 0 16px;font-size:1.1rem;">Add Focus Link</h3>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:0.8rem;display:block;margin-bottom:4px;">Name</label>
+                    <input id="qaName" type="text" placeholder="e.g. Spotify" style="width:100%;box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="font-size:0.8rem;display:block;margin-bottom:4px;">Type</label>
+                    <select id="qaType" style="width:100%;box-sizing:border-box;" onchange="document.getElementById('qaAppGrid').style.display=this.value==='app'?'flex':'none'">
+                        <option value="website">Website</option>
+                        <option value="app">Desktop App</option>
+                    </select>
+                </div>
+                <div id="qaAppGrid" style="display:none;flex-wrap:wrap;gap:4px;margin-bottom:10px;">
+                    ${POPULAR_APPS.map(a => `<button type="button" style="font-size:0.78rem;padding:4px 8px;" onclick="document.getElementById('qaName').value='${a.name}';document.getElementById('qaUrl').value='${a.uri}'">${a.name}</button>`).join('')}
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:0.8rem;display:block;margin-bottom:4px;" id="qaUrlLabel">URL</label>
+                    <input id="qaUrl" type="text" placeholder="https://…" style="width:100%;box-sizing:border-box;">
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button id="qaSubmit" type="button" style="flex:1;">Add</button>
+                    <button type="button" style="flex:1;background:transparent;border:1px solid var(--form-border-color);color:var(--text-color);" onclick="document.getElementById('focusLinkOverlay').remove()">Cancel</button>
+                </div>
+            </div>`;
+        overlay.id = 'focusLinkOverlay';
+        overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+        document.getElementById('qaType').addEventListener('change', function() {
+            document.getElementById('qaUrlLabel').textContent = this.value === 'app' ? 'App URI (e.g. spotify:)' : 'URL';
+        });
+        document.getElementById('qaSubmit').onclick = async function() {
+            const name = document.getElementById('qaName').value.trim();
+            const url  = document.getElementById('qaUrl').value.trim();
+            const appType = document.getElementById('qaType').value;
+            if (!name || !url) return;
+            this.textContent = '…';
+            this.disabled = true;
+            try {
+                await fetch('/settings/whitelist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+                    body: new URLSearchParams({ action: 'add', name, url, appType })
+                });
+                _localWhitelist.push({ name, url, appType });
+                overlay.remove();
+                renderFocusPanel();
+            } catch(e) {
+                this.textContent = 'Add';
+                this.disabled = false;
+            }
+        };
+        document.body.appendChild(overlay);
+    }
+</script>

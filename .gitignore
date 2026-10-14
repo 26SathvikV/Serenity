@@ -1,0 +1,7 @@
+/old
+node_modules/
+dist/
+build/
+.env
+MUSIC_SETUP.txt
+RELEASE.md

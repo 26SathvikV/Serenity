@@ -1,0 +1,190 @@
+<style>
+    .greeting {
+        font-size: 1.6rem;
+        color: var(--heading-color);
+        margin-bottom: 0;
+        text-align: left;
+    }
+
+    .page-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .stats-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    .stat-card {
+        flex: 1;
+        min-width: 80px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 14px 12px 10px;
+        background: var(--form-bg-color);
+        border: 1px solid var(--form-border-color);
+        border-radius: 10px;
+        text-decoration: none;
+        transition: border-color 0.15s;
+    }
+    .stat-card:hover { border-color: var(--link-color); text-decoration: none; }
+    .stat-num {
+        font-size: 1.7rem;
+        font-weight: 700;
+        color: var(--heading-color);
+        line-height: 1.1;
+    }
+    .stat-streak .stat-num { color: #ff9955; }
+    .stat-label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--link-color);
+        margin-top: 3px;
+        text-align: center;
+    }
+</style>
+
+<%
+function parsePriority(name) {
+    const m = (name || '').match(/^\[(HIGH|LOW)\]\s*/);
+    if (m) return { clean: name.slice(m[0].length), priority: m[1] };
+    return { clean: name, priority: null };
+}
+function estMins(tasks) {
+    const total = (tasks || []).reduce((s, t) => s + (t.duration || 0), 0);
+    return total > 0 ? total : null;
+}
+%>
+
+<div class="page-top">
+    <h2 class="greeting">Hello, <%= user.name %>.</h2>
+    <button onclick="window.location.href='/add'">+ Add Session</button>
+</div>
+
+<div class="stats-row">
+    <a class="stat-card" href="/history">
+        <span class="stat-num"><%= stats.weekCompleted %></span>
+        <span class="stat-label">this week</span>
+    </a>
+    <a class="stat-card" href="/history">
+        <span class="stat-num"><%= stats.total %></span>
+        <span class="stat-label">sessions done</span>
+    </a>
+    <a class="stat-card" href="/history">
+        <span class="stat-num"><%= stats.totalTasksDone %></span>
+        <span class="stat-label">tasks done</span>
+    </a>
+    <% if (stats.streak >= 2) { %>
+    <div class="stat-card stat-streak">
+        <span class="stat-num"><%= stats.streak %></span>
+        <span class="stat-label">day streak</span>
+    </div>
+    <% } %>
+</div>
+
+<% if (!next) { %>
+<div class="empty-state">
+    <p>No upcoming sessions. <a href="/add">Add one to get started.</a></p>
+</div>
+<% } else { %>
+
+<% const nextGroup = next.groupId && groupMap[next.groupId.toString()] ? groupMap[next.groupId.toString()] : null; %>
+<% const nextP = parsePriority(next.name); %>
+<div class="featured-card">
+    <div class="group-stripe" style="background-color: <%= nextGroup ? nextGroup.color : 'var(--link-color)' %>;"></div>
+    <div class="session-info">
+        <p class="session-name">
+            <% if (nextP.priority) { %><span class="priority-badge priority-<%= nextP.priority.toLowerCase() %>"><%= nextP.priority %></span><% } %>
+            <%= nextP.clean %>
+        </p>
+        <p class="session-meta">
+            <%= nextGroup ? nextGroup.name : 'No Group' %> &nbsp;&middot;&nbsp;
+            <span class="fmt-date" data-date="<%= next.date %>"></span>
+        </p>
+        <p class="session-meta"><%= next.tasks.length %> task<%= next.tasks.length !== 1 ? 's' : '' %><% const nextEst = estMins(next.tasks); if (nextEst) { %>&nbsp;&middot;&nbsp;~<%= nextEst %>m<% } %></p>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+        <button onclick="window.location.href='/work/<%= next._id %>'">Start</button>
+        <form method="POST" action="/delete/session/<%= next._id %>" style="display:inline;" onsubmit="return confirm('Delete this session?')">
+            <button type="submit" class="btn-danger btn-sm">Delete</button>
+        </form>
+    </div>
+</div>
+
+<% } %>
+
+<% if (upcoming.length > 1) { %>
+<div class="section-header">
+    <h2>Upcoming</h2>
+    <hr>
+</div>
+<% upcoming.slice(1).forEach(function(s) { %>
+<% const g = s.groupId && groupMap[s.groupId.toString()] ? groupMap[s.groupId.toString()] : null; %>
+<% const p = parsePriority(s.name); %>
+<div class="session-card">
+    <div class="group-stripe" style="background-color: <%= g ? g.color : 'var(--form-border-color)' %>;"></div>
+    <div class="session-info">
+        <p class="session-name">
+            <% if (p.priority) { %><span class="priority-badge priority-<%= p.priority.toLowerCase() %>"><%= p.priority %></span><% } %>
+            <%= p.clean %>
+        </p>
+        <p class="session-meta">
+            <%= g ? g.name : 'No Group' %> &nbsp;&middot;&nbsp;
+            <span class="fmt-date" data-date="<%= s.date %>"></span>
+        </p>
+        <p class="session-meta"><%= s.tasks.length %> task<%= s.tasks.length !== 1 ? 's' : '' %><% const uEst = estMins(s.tasks); if (uEst) { %>&nbsp;&middot;&nbsp;~<%= uEst %>m<% } %></p>
+    </div>
+    <div class="session-actions">
+        <button class="btn-sm" onclick="window.location.href='/work/<%= s._id %>'">Start</button>
+        <form method="POST" action="/delete/session/<%= s._id %>" style="display:inline;" onsubmit="return confirm('Delete this session?')">
+            <button type="submit" class="btn-danger btn-sm">Delete</button>
+        </form>
+    </div>
+</div>
+<% }); %>
+<% } %>
+
+<% if (delayed.length > 0) { %>
+<div class="section-header">
+    <h2 style="color: #c06060;">Delayed</h2>
+    <hr>
+</div>
+<% delayed.forEach(function(s) {
+    if (next && s._id.toString() === next._id.toString()) return; %>
+<% const g = s.groupId && groupMap[s.groupId.toString()] ? groupMap[s.groupId.toString()] : null; %>
+<% const p = parsePriority(s.name); %>
+<div class="session-card" style="border-color: rgba(180,80,80,0.4);">
+    <div class="group-stripe" style="background-color: <%= g ? g.color : '#c06060' %>;"></div>
+    <div class="session-info">
+        <p class="session-name">
+            <% if (p.priority) { %><span class="priority-badge priority-<%= p.priority.toLowerCase() %>"><%= p.priority %></span><% } %>
+            <%= p.clean %>
+        </p>
+        <p class="session-meta">
+            <%= g ? g.name : 'No Group' %> &nbsp;&middot;&nbsp;
+            <span class="fmt-date" data-date="<%= s.date %>"></span>
+        </p>
+        <p class="session-meta"><%= s.tasks.length %> task<%= s.tasks.length !== 1 ? 's' : '' %><% const dEst = estMins(s.tasks); if (dEst) { %>&nbsp;&middot;&nbsp;~<%= dEst %>m<% } %></p>
+    </div>
+    <div class="session-actions">
+        <button class="btn-sm" onclick="window.location.href='/work/<%= s._id %>'">Start</button>
+        <form method="POST" action="/delete/session/<%= s._id %>" style="display:inline;" onsubmit="return confirm('Delete this session?')">
+            <button type="submit" class="btn-danger btn-sm">Delete</button>
+        </form>
+    </div>
+</div>
+<% }); %>
+<% } %>
+
+<script>
+    document.querySelectorAll('.fmt-date').forEach(el => {
+        const d = el.dataset.date;
+        if (d) el.textContent = moment(d).calendar();
+    });
+</script>

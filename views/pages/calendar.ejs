@@ -1,0 +1,868 @@
+<style>
+.cal-wrap {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 24px;
+    align-items: start;
+}
+@media (max-width: 800px) {
+    .cal-wrap { grid-template-columns: 1fr; }
+}
+
+.cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.cal-sync-btns {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.cal-sync-btn {
+    font-size: 0.78rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid var(--form-border-color);
+    color: var(--link-color);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.cal-sync-btn:hover { background: var(--form-bg-color); }
+.cal-gcal-link {
+    font-size: 0.72rem;
+    color: var(--link-color);
+    white-space: nowrap;
+    text-decoration: none;
+    border: 1px solid var(--form-border-color);
+    border-radius: 5px;
+    padding: 2px 7px;
+    margin-top: 6px;
+    display: inline-block;
+}
+.cal-gcal-link:hover { background: var(--form-bg-color); }
+.cal-month-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--heading-color);
+}
+.cal-nav {
+    background: transparent;
+    border: 1px solid var(--form-border-color);
+    color: var(--link-color);
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+.cal-nav:hover { background: var(--form-bg-color); }
+
+.cal-view-btns {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+    justify-content: center;
+}
+.cal-view-btn {
+    font-size: 0.72rem;
+    padding: 3px 11px;
+    border-radius: 4px;
+    background: transparent;
+    border: 1px solid var(--form-border-color);
+    color: var(--link-color);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.cal-view-btn.active {
+    background: var(--link-color);
+    border-color: var(--link-color);
+    color: #fff;
+}
+.cal-view-btn:hover:not(.active) { background: var(--form-bg-color); }
+
+.cal-day-labels {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 4px;
+}
+.cal-day-label {
+    text-align: center;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--link-color);
+    padding-bottom: 6px;
+}
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+}
+.cal-cell {
+    min-height: 64px;
+    padding: 6px 5px 5px;
+    border-radius: 7px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.1s;
+}
+.cal-cell:hover { background: var(--form-bg-color); }
+.cal-cell.today { border-color: var(--link-color); }
+.cal-cell.selected { background: var(--form-bg-color); border-color: var(--heading-color); }
+.cal-cell.other-month { opacity: 0.28; pointer-events: none; }
+.cal-day-num {
+    font-size: 0.82rem;
+    color: var(--text-color);
+    margin-bottom: 4px;
+}
+.cal-cell.today .cal-day-num { color: var(--heading-color); font-weight: 700; }
+.cal-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+.cal-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.cal-panel {
+    background: var(--form-bg-color);
+    border: 1px solid var(--form-border-color);
+    border-radius: 10px;
+    padding: 16px;
+    position: sticky;
+    top: 16px;
+}
+.cal-panel-empty {
+    opacity: 0.5;
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 24px 0;
+}
+.cal-panel-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--link-color);
+    margin-bottom: 12px;
+}
+.cal-session-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--form-border-color);
+}
+.cal-session-row:last-child { border-bottom: none; }
+.cal-stripe {
+    width: 4px;
+    align-self: stretch;
+    border-radius: 2px;
+    flex-shrink: 0;
+    min-height: 36px;
+}
+.cal-session-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--heading-color);
+    margin: 0 0 2px;
+}
+.cal-session-meta {
+    font-size: 0.75rem;
+    color: var(--link-color);
+    margin: 0;
+}
+.cal-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 4px;
+}
+.cal-badge-done {
+    background: rgba(60,180,80,0.15);
+    color: #6dbb6d;
+    border: 1px solid rgba(60,180,80,0.3);
+}
+.cal-badge-upcoming {
+    background: rgba(140,136,243,0.1);
+    color: var(--link-color);
+    border: 1px solid var(--form-border-color);
+}
+.tz-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(140,136,243,0.1);
+    border: 1px solid var(--form-border-color);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    flex-wrap: wrap;
+}
+
+/* Week view */
+.cal-week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(90px, 1fr));
+    gap: 4px;
+    overflow-x: auto;
+}
+.cal-week-col {
+    border: 1px solid var(--form-border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    min-height: 120px;
+}
+.cal-week-col.today { border-color: var(--link-color); }
+.cal-week-col-hdr {
+    text-align: center;
+    padding: 8px 4px;
+    background: var(--form-bg-color);
+    cursor: pointer;
+}
+.cal-week-col.today .cal-week-col-hdr { background: var(--link-color); color: #fff; }
+.cal-week-col-hdr:hover { opacity: 0.85; }
+.cal-week-dayname { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.07em; opacity: 0.8; }
+.cal-week-daynum  { font-size: 1rem; font-weight: 700; line-height: 1.3; }
+.cal-week-sessions { padding: 4px; }
+.cal-scard {
+    margin-bottom: 4px;
+    padding: 4px 6px;
+    border-radius: 5px;
+    background: var(--form-bg-color);
+    cursor: pointer;
+    overflow: hidden;
+}
+.cal-scard:hover { opacity: 0.8; }
+.cal-scard-time { font-size: 0.65rem; color: var(--link-color); margin-bottom: 1px; }
+.cal-scard-name { font-size: 0.73rem; color: var(--heading-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Day view */
+.cal-day-view-row {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--form-border-color);
+}
+.cal-day-view-row:last-of-type { border-bottom: none; }
+.cal-day-view-time {
+    font-size: 0.82rem;
+    color: var(--link-color);
+    min-width: 62px;
+    text-align: right;
+    padding-top: 3px;
+    flex-shrink: 0;
+}
+</style>
+
+<div id="tzBanner" class="tz-banner" style="display:none;">
+    <span style="flex:1;">Your browser timezone (<span id="tzBrowserLabel"></span>) differs from your saved timezone (<span id="tzSavedLabel"></span>). Dates may appear on different days.</span>
+    <a href="/settings" style="white-space:nowrap;">Update in Settings →</a>
+</div>
+
+<div class="cal-sync-btns">
+    <a class="cal-sync-btn" href="/calendar/export.ics" title="Download all sessions as an .ics file">⭳ Export .ics</a>
+    <button type="button" class="cal-sync-btn" onclick="document.getElementById('icsImportInput').click()" title="Import events from an .ics file">⭱ Import .ics</button>
+    <input type="file" id="icsImportInput" accept=".ics,text/calendar" style="display:none;">
+    <span id="icsImportStatus" style="font-size:0.78rem;color:var(--link-color);align-self:center;"></span>
+</div>
+
+<div class="cal-wrap" id="calWrap">
+    <div>
+        <div class="cal-header">
+            <button class="cal-nav" onclick="changeNav(-1)">&#8249;</button>
+            <div style="text-align:center;">
+                <span class="cal-month-label" id="calMonthLabel"></span>
+                <div class="cal-view-btns">
+                    <button class="cal-view-btn active" id="viewBtnMonth" onclick="setView('month')">Month</button>
+                    <button class="cal-view-btn" id="viewBtnWeek" onclick="setView('week')">Week</button>
+                    <button class="cal-view-btn" id="viewBtnDay"  onclick="setView('day')">Day</button>
+                </div>
+            </div>
+            <button class="cal-nav" onclick="changeNav(1)">&#8250;</button>
+        </div>
+
+        <div id="monthViewContent">
+            <div class="cal-day-labels" id="calDayLabels"></div>
+            <div class="cal-grid" id="calGrid"></div>
+        </div>
+        <div id="weekViewContent" style="display:none;overflow-x:auto;"></div>
+        <div id="dayViewContent"  style="display:none;"></div>
+    </div>
+
+    <div class="cal-panel" id="calPanel">
+        <p class="cal-panel-empty">Select a day to see sessions.</p>
+    </div>
+</div>
+
+<div id="calLegend" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:0.75rem;color:var(--text-color);"></div>
+
+<script>
+(function () {
+    var sessions  = <%- sessionsJson %>;
+    var groups    = <%- groupsJson %>;
+    var startDay  = '<%- locals.startDay || "monday" %>';
+    var savedTz   = '<%- locals.timezone || "" %>';
+
+    var groupMap = {};
+    groups.forEach(function (g) { groupMap[g._id] = g; });
+
+    // ── Timezone handling ─────────────────────────────────────────────────────
+    var browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    var activeTz  = savedTz || browserTz;
+
+    if (savedTz && savedTz !== browserTz) {
+        document.getElementById('tzBanner').style.display = 'flex';
+        document.getElementById('tzBrowserLabel').textContent = browserTz;
+        document.getElementById('tzSavedLabel').textContent = savedTz;
+    }
+
+    function sessionDateParts(isoStr) {
+        try {
+            var fmt = new Intl.DateTimeFormat('en-CA', {
+                timeZone: activeTz,
+                year: 'numeric', month: '2-digit', day: '2-digit'
+            });
+            var parts = fmt.formatToParts(new Date(isoStr));
+            var p = {};
+            parts.forEach(function (x) { p[x.type] = x.value; });
+            return { year: parseInt(p.year), month: parseInt(p.month) - 1, day: parseInt(p.day) };
+        } catch (e) {
+            var d = new Date(isoStr);
+            return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+        }
+    }
+
+    function formatTime(isoStr) {
+        try {
+            return new Intl.DateTimeFormat('en-US', {
+                timeZone: activeTz, hour: 'numeric', minute: '2-digit', hour12: true
+            }).format(new Date(isoStr));
+        } catch(e) {
+            var d = new Date(isoStr);
+            return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        }
+    }
+
+    // ── Calendar state ────────────────────────────────────────────────────────
+    var today = (function() {
+        return sessionDateParts(new Date().toISOString());
+    })();
+    var curYear  = today.year;
+    var curMonth = today.month;
+    var selected = null;
+    var calView  = 'month';
+
+    // Week view state: start of the current week
+    var _thisWeekStart = (function() {
+        var d = new Date(today.year, today.month, today.day);
+        var diff = (d.getDay() - startDayJs + 7) % 7;
+        d.setDate(d.getDate() - diff);
+        return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
+    });
+    var weekStartY, weekStartM, weekStartD;
+
+    // Day view state
+    var dayViewY = today.year;
+    var dayViewM = today.month;
+    var dayViewD = today.day;
+
+    var MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var DAY_JS   = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
+    var DAY_ABBR = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var startDayJs = DAY_JS[startDay] !== undefined ? DAY_JS[startDay] : 1;
+
+    // Init week state now that startDayJs is known
+    (function() {
+        var ws = _thisWeekStart();
+        weekStartY = ws.y; weekStartM = ws.m; weekStartD = ws.d;
+    })();
+
+    function dayLabels() {
+        var out = [];
+        for (var i = 0; i < 7; i++) out.push(DAY_ABBR[(startDayJs + i) % 7]);
+        return out;
+    }
+
+    function colOffset(jsDay) { return (jsDay - startDayJs + 7) % 7; }
+
+    function groupColor(s) {
+        var g = s.groupId && groupMap[s.groupId];
+        return g ? g.color : 'var(--link-color)';
+    }
+
+    function dayKey(y, m, d) { return y + '|' + m + '|' + d; }
+
+    function buildMap(year, month) {
+        var map = {};
+        sessions.forEach(function (s) {
+            var dp = sessionDateParts(s.date);
+            if (dp.year === year && dp.month === month) {
+                var k = dayKey(year, month, dp.day);
+                (map[k] = map[k] || []).push(s);
+            }
+        });
+        return map;
+    }
+
+    function sessionsForDay(y, m, d) {
+        var results = [];
+        sessions.forEach(function(s) {
+            var dp = sessionDateParts(s.date);
+            if (dp.year === y && dp.month === m && dp.day === d) results.push(s);
+        });
+        results.sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+        return results;
+    }
+
+    function esc(str) {
+        return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function toIsoDate(y, m, d) {
+        return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    }
+
+    // ── Google Calendar quick-add link ────────────────────────────────────────
+    function sessionDurationMinutes(s) {
+        if (s.duration) return s.duration;
+        var total = (s.tasks || []).reduce(function (sum, t) { return sum + (t.duration || 0); }, 0);
+        return total > 0 ? total : 30;
+    }
+
+    function gcalStamp(d) {
+        function pad(n) { return String(n).padStart(2, '0'); }
+        return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' +
+            pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + 'Z';
+    }
+
+    function gcalUrl(s) {
+        var start = new Date(s.date);
+        var end = new Date(start.getTime() + sessionDurationMinutes(s) * 60000);
+        var g = s.groupId && groupMap[s.groupId];
+        var details = [];
+        if (s.description) details.push(s.description);
+        if (g) details.push('Group: ' + g.name);
+        if ((s.tasks || []).length) details.push('Tasks: ' + s.tasks.map(function (t) { return t.name; }).join(', '));
+        var params = new URLSearchParams({
+            action: 'TEMPLATE',
+            text: s.name || 'Untitled Session',
+            dates: gcalStamp(start) + '/' + gcalStamp(end),
+            details: details.join('\n'),
+            location: s.location || ''
+        });
+        return 'https://www.google.com/calendar/render?' + params.toString();
+    }
+
+    // ── .ics import ────────────────────────────────────────────────────────────
+    document.getElementById('icsImportInput').addEventListener('change', function (e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var status = document.getElementById('icsImportStatus');
+        status.textContent = 'Importing…';
+        var reader = new FileReader();
+        reader.onload = function () {
+            fetch('/calendar/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/calendar' },
+                body: reader.result
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.error) { status.textContent = data.error; return; }
+                    status.textContent = 'Imported ' + data.imported + ' event' + (data.imported === 1 ? '' : 's') +
+                        (data.skippedForLimit ? ' (plan limit reached, some skipped)' : '') + '. Reloading…';
+                    setTimeout(function () { window.location.reload(); }, 900);
+                })
+                .catch(function () { status.textContent = 'Import failed.'; });
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    });
+
+    // ── Month view panel ──────────────────────────────────────────────────────
+    function renderPanel(y, m, d, daySessions) {
+        var panel  = document.getElementById('calPanel');
+        var title  = MONTHS[m] + ' ' + d + ', ' + y;
+        var addUrl = '/add?date=' + toIsoDate(y, m, d);
+        var html   = '<p class="cal-panel-title">' + title + '</p>';
+
+        if (!daySessions || daySessions.length === 0) {
+            html += '<p style="opacity:0.5;font-size:0.9rem;margin-bottom:16px;">No sessions this day.</p>';
+        } else {
+            daySessions.forEach(function (s) {
+                var color = groupColor(s);
+                var g     = s.groupId && groupMap[s.groupId];
+                var done  = (s.tasks || []).filter(function (t) { return t.done; }).length;
+                var total = (s.tasks || []).length;
+                var badge = s.completed
+                    ? '<span class="cal-badge cal-badge-done">Done</span>'
+                    : '<span class="cal-badge cal-badge-upcoming">Upcoming</span>';
+                html += '<div class="cal-session-row">';
+                html += '<div class="cal-stripe" style="background:' + color + '"></div>';
+                html += '<div style="flex:1;min-width:0;">';
+                html += '<p class="cal-session-name">' + esc(s.name) + badge + '</p>';
+                html += '<p class="cal-session-meta">' + formatTime(s.date);
+                if (g) html += ' &middot; ' + esc(g.name);
+                if (total > 0) html += ' &middot; ' + done + '/' + total + ' tasks';
+                html += '</p>';
+                html += '<a class="cal-gcal-link" target="_blank" rel="noopener" href="' + gcalUrl(s) + '">+ Google Calendar</a>';
+                html += '</div>';
+                if (!s.completed) {
+                    html += '<a href="/work/' + s._id + '" style="font-size:0.8rem;white-space:nowrap;">Start →</a>';
+                }
+                html += '</div>';
+            });
+        }
+
+        html += '<a href="' + addUrl + '" style="display:block;margin-top:14px;text-align:center;padding:8px;border:1px dashed var(--form-border-color);border-radius:7px;font-size:0.85rem;color:var(--link-color);">+ Add session for this day</a>';
+        panel.innerHTML = html;
+    }
+
+    // ── Month view ─────────────────────────────────────────────────────────────
+    function renderDayLabels() {
+        var container = document.getElementById('calDayLabels');
+        container.innerHTML = '';
+        dayLabels().forEach(function (lbl) {
+            var d = document.createElement('div');
+            d.className = 'cal-day-label';
+            d.textContent = lbl;
+            container.appendChild(d);
+        });
+    }
+
+    function renderMonth() {
+        document.getElementById('calMonthLabel').textContent = MONTHS[curMonth] + ' ' + curYear;
+        renderDayLabels();
+
+        var grid        = document.getElementById('calGrid');
+        grid.innerHTML  = '';
+
+        var dayMap      = buildMap(curYear, curMonth);
+        var firstJsDay  = new Date(curYear, curMonth, 1).getDay();
+        var daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+        var daysInPrev  = new Date(curYear, curMonth, 0).getDate();
+        var offset      = colOffset(firstJsDay);
+        var cells       = Math.ceil((offset + daysInMonth) / 7) * 7;
+
+        for (var i = 0; i < cells; i++) {
+            var dn, cy, cm, other = false;
+            if (i < offset) {
+                dn    = daysInPrev - offset + i + 1;
+                cm    = curMonth === 0 ? 11 : curMonth - 1;
+                cy    = curMonth === 0 ? curYear - 1 : curYear;
+                other = true;
+            } else if (i >= offset + daysInMonth) {
+                dn    = i - offset - daysInMonth + 1;
+                cm    = curMonth === 11 ? 0 : curMonth + 1;
+                cy    = curMonth === 11 ? curYear + 1 : curYear;
+                other = true;
+            } else {
+                dn = i - offset + 1;
+                cy = curYear;
+                cm = curMonth;
+            }
+
+            var isToday = !other && cy === today.year && cm === today.month && dn === today.day;
+            var isSel   = selected && !other && cy === selected.y && cm === selected.m && dn === selected.d;
+            var ss      = other ? [] : (dayMap[dayKey(cy, cm, dn)] || []);
+
+            var cell = document.createElement('div');
+            cell.className = 'cal-cell' +
+                (other   ? ' other-month' : '') +
+                (isToday ? ' today'       : '') +
+                (isSel   ? ' selected'    : '');
+
+            var num = document.createElement('div');
+            num.className = 'cal-day-num';
+            num.textContent = dn;
+            cell.appendChild(num);
+
+            if (ss.length > 0) {
+                var dots = document.createElement('div');
+                dots.className = 'cal-dots';
+                ss.slice(0, 7).forEach(function (s) {
+                    var dot = document.createElement('div');
+                    dot.className = 'cal-dot';
+                    var c = groupColor(s);
+                    if (s.completed) {
+                        dot.style.background = c;
+                    } else {
+                        dot.style.background = 'transparent';
+                        dot.style.border = '1.5px solid ' + c;
+                    }
+                    dots.appendChild(dot);
+                });
+                if (ss.length > 7) {
+                    var more = document.createElement('span');
+                    more.style.cssText = 'font-size:0.58rem;color:var(--link-color);line-height:7px;';
+                    more.textContent = '+' + (ss.length - 7);
+                    dots.appendChild(more);
+                }
+                cell.appendChild(dots);
+            }
+
+            (function (y, m, d, daySessions) {
+                cell.onclick = function () {
+                    selected = { y: y, m: m, d: d };
+                    renderMonth();
+                    renderPanel(y, m, d, daySessions);
+                };
+            })(cy, cm, dn, ss);
+
+            grid.appendChild(cell);
+        }
+    }
+
+    // ── Week view ──────────────────────────────────────────────────────────────
+    function renderWeek() {
+        var container = document.getElementById('weekViewContent');
+        container.innerHTML = '';
+
+        var grid = document.createElement('div');
+        grid.className = 'cal-week-grid';
+
+        for (var i = 0; i < 7; i++) {
+            var dayDate = new Date(weekStartY, weekStartM, weekStartD + i);
+            var dy = dayDate.getFullYear();
+            var dm = dayDate.getMonth();
+            var dd = dayDate.getDate();
+            var dow = dayDate.getDay();
+            var isToday = dy === today.year && dm === today.month && dd === today.day;
+
+            var col = document.createElement('div');
+            col.className = 'cal-week-col' + (isToday ? ' today' : '');
+
+            var hdr = document.createElement('div');
+            hdr.className = 'cal-week-col-hdr';
+            hdr.innerHTML =
+                '<div class="cal-week-dayname">' + DAY_ABBR[dow] + '</div>' +
+                '<div class="cal-week-daynum">' + dd + '</div>';
+
+            var daySessions = sessionsForDay(dy, dm, dd);
+            var sessionArea = document.createElement('div');
+            sessionArea.className = 'cal-week-sessions';
+
+            daySessions.forEach(function(s) {
+                var color = groupColor(s);
+                var card = document.createElement('div');
+                card.className = 'cal-scard';
+                card.style.borderLeft = '3px solid ' + color;
+                card.innerHTML =
+                    '<div class="cal-scard-time">' + formatTime(s.date) + (s.completed ? ' (completed)' : '') + '</div>' +
+                    '<div class="cal-scard-name" title="' + esc(s.name) + '">' + esc(s.name) + '</div>';
+                if (!s.completed) {
+                    card.onclick = function(e) { e.stopPropagation(); window.location.href = '/work/' + s._id; };
+                }
+                sessionArea.appendChild(card);
+            });
+
+            col.appendChild(hdr);
+            col.appendChild(sessionArea);
+
+            // Click column header → switch to day view for that specific day
+            (function(dy, dm, dd) {
+                hdr.onclick = function() { setView('day', dy, dm, dd); };
+            })(dy, dm, dd);
+
+            grid.appendChild(col);
+        }
+
+        container.appendChild(grid);
+
+        // Update header label
+        var weekEnd = new Date(weekStartY, weekStartM, weekStartD + 6);
+        var label;
+        if (weekEnd.getMonth() !== weekStartM || weekEnd.getFullYear() !== weekStartY) {
+            label = MONTHS[weekStartM].slice(0,3) + ' ' + weekStartD +
+                    ' – ' + MONTHS[weekEnd.getMonth()].slice(0,3) + ' ' + weekEnd.getDate() +
+                    ', ' + weekEnd.getFullYear();
+        } else {
+            label = MONTHS[weekStartM] + ' ' + weekStartD + '–' + weekEnd.getDate() + ', ' + weekStartY;
+        }
+        document.getElementById('calMonthLabel').textContent = label;
+    }
+
+    // ── Day view ──────────────────────────────────────────────────────────────
+    function renderDay() {
+        var container = document.getElementById('dayViewContent');
+        container.innerHTML = '';
+
+        var dow = new Date(dayViewY, dayViewM, dayViewD).getDay();
+        document.getElementById('calMonthLabel').textContent =
+            DAY_FULL[dow] + ', ' + MONTHS[dayViewM] + ' ' + dayViewD + ', ' + dayViewY;
+
+        var daySessions = sessionsForDay(dayViewY, dayViewM, dayViewD);
+
+        if (daySessions.length === 0) {
+            var empty = document.createElement('p');
+            empty.style.cssText = 'opacity:0.5;text-align:center;padding:40px 0;font-size:0.9rem;';
+            empty.textContent = 'No sessions this day.';
+            container.appendChild(empty);
+        } else {
+            daySessions.forEach(function(s) {
+                var color = groupColor(s);
+                var g     = s.groupId && groupMap[s.groupId];
+                var done  = (s.tasks || []).filter(function(t) { return t.done; }).length;
+                var total = (s.tasks || []).length;
+                var badge = s.completed
+                    ? '<span class="cal-badge cal-badge-done">Done</span>'
+                    : '<span class="cal-badge cal-badge-upcoming">Upcoming</span>';
+
+                var row = document.createElement('div');
+                row.className = 'cal-day-view-row';
+
+                var timeCol = document.createElement('div');
+                timeCol.className = 'cal-day-view-time';
+                timeCol.textContent = formatTime(s.date);
+
+                var stripe = document.createElement('div');
+                stripe.style.cssText = 'width:3px;border-radius:2px;flex-shrink:0;background:' + color + ';align-self:stretch;';
+
+                var info = document.createElement('div');
+                info.style.cssText = 'flex:1;min-width:0;';
+                var metaParts = [];
+                if (g) metaParts.push(esc(g.name));
+                if (total > 0) metaParts.push(done + '/' + total + ' tasks');
+                info.innerHTML =
+                    '<p class="cal-session-name">' + esc(s.name) + badge + '</p>' +
+                    (metaParts.length ? '<p class="cal-session-meta">' + metaParts.join(' &middot; ') + '</p>' : '');
+
+                row.appendChild(timeCol);
+                row.appendChild(stripe);
+                row.appendChild(info);
+
+                if (!s.completed) {
+                    var startLink = document.createElement('a');
+                    startLink.href = '/work/' + s._id;
+                    startLink.style.cssText = 'font-size:0.8rem;white-space:nowrap;align-self:center;';
+                    startLink.textContent = 'Start →';
+                    row.appendChild(startLink);
+                }
+
+                container.appendChild(row);
+            });
+        }
+
+        var addLink = document.createElement('a');
+        addLink.href = '/add?date=' + toIsoDate(dayViewY, dayViewM, dayViewD);
+        addLink.style.cssText = 'display:block;margin-top:16px;text-align:center;padding:8px;border:1px dashed var(--form-border-color);border-radius:7px;font-size:0.85rem;color:var(--link-color);';
+        addLink.textContent = '+ Add session for this day';
+        container.appendChild(addLink);
+    }
+
+    // ── View switching ─────────────────────────────────────────────────────────
+    // setView(view, [y, m, d])
+    // y/m/d pins the day view to a specific date (e.g. from week col click)
+    window.setView = function(view, y, m, d) {
+        calView = view;
+
+        ['month','week','day'].forEach(function(v) {
+            var id = 'viewBtn' + v.charAt(0).toUpperCase() + v.slice(1);
+            var btn = document.getElementById(id);
+            if (btn) btn.classList.toggle('active', v === view);
+        });
+
+        document.getElementById('monthViewContent').style.display = view === 'month' ? 'block' : 'none';
+        document.getElementById('weekViewContent').style.display  = view === 'week'  ? 'block' : 'none';
+        document.getElementById('dayViewContent').style.display   = view === 'day'   ? 'block' : 'none';
+        document.getElementById('calPanel').style.display         = view === 'month' ? 'block' : 'none';
+        document.getElementById('calWrap').style.gridTemplateColumns = view === 'month' ? '' : '1fr';
+
+        if (view === 'week') {
+            var selDate = selected
+                ? new Date(selected.y, selected.m, selected.d)
+                : new Date(curYear, curMonth, today.month === curMonth ? today.day : 1);
+            var diff = (selDate.getDay() - startDayJs + 7) % 7;
+            var ws = new Date(selDate); ws.setDate(ws.getDate() - diff);
+            weekStartY = ws.getFullYear(); weekStartM = ws.getMonth(); weekStartD = ws.getDate();
+        } else if (view === 'day') {
+            // Explicit date passed (e.g. from week column click) takes priority
+            if (y !== undefined) {
+                dayViewY = y; dayViewM = m; dayViewD = d;
+            } else {
+                // Sync to selected month cell or today when switching via button
+                dayViewY = selected ? selected.y : today.year;
+                dayViewM = selected ? selected.m : today.month;
+                dayViewD = selected ? selected.d : today.day;
+            }
+        }
+
+        render();
+    };
+
+    // ── Navigation ─────────────────────────────────────────────────────────────
+    window.changeNav = function(delta) {
+        if (calView === 'month') {
+            changeMonth(delta);
+        } else if (calView === 'week') {
+            var ws = new Date(weekStartY, weekStartM, weekStartD + delta * 7);
+            weekStartY = ws.getFullYear(); weekStartM = ws.getMonth(); weekStartD = ws.getDate();
+            render();
+        } else {
+            var dd = new Date(dayViewY, dayViewM, dayViewD + delta);
+            dayViewY = dd.getFullYear(); dayViewM = dd.getMonth(); dayViewD = dd.getDate();
+            render();
+        }
+    };
+
+    window.changeMonth = function (delta) {
+        curMonth += delta;
+        if (curMonth < 0)  { curMonth = 11; curYear--; }
+        if (curMonth > 11) { curMonth = 0;  curYear++; }
+        selected = null;
+        document.getElementById('calPanel').innerHTML = '<p class="cal-panel-empty">Select a day to see sessions.</p>';
+        render();
+    };
+
+    // ── Main render dispatcher ─────────────────────────────────────────────────
+    function render() {
+        if (calView === 'month') renderMonth();
+        else if (calView === 'week') renderWeek();
+        else renderDay();
+    }
+
+    render();
+
+    // Group legend
+    (function renderLegend() {
+        var legend = document.getElementById('calLegend');
+        if (!legend) return;
+        var usedIds = new Set(sessions.map(function(s) { return s.groupId; }).filter(Boolean));
+        legend.innerHTML = '';
+        groups.filter(function(g) { return usedIds.has(g._id); }).forEach(function(g) {
+            var item = document.createElement('span');
+            item.style.cssText = 'display:flex;align-items:center;gap:5px;';
+            var dot = document.createElement('span');
+            dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' + g.color + ';flex-shrink:0;display:inline-block;';
+            var lbl = document.createElement('span');
+            lbl.textContent = g.name;
+            item.appendChild(dot); item.appendChild(lbl);
+            legend.appendChild(item);
+        });
+    })();
+
+    // Auto-select today
+    var todayMap = buildMap(today.year, today.month);
+    var todayKey = dayKey(today.year, today.month, today.day);
+    selected = { y: today.year, m: today.month, d: today.day };
+    render();
+    renderPanel(today.year, today.month, today.day, todayMap[todayKey] || []);
+})();
+
+</script>

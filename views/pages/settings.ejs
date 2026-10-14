@@ -1,0 +1,1217 @@
+<style>
+    .settings-container {
+        max-width: 640px;
+        margin: 0 auto;
+    }
+
+    .service-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+    .service-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 12px;
+        background-color: var(--form-bg-color);
+        border: 1px solid var(--form-border-color);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: border-color 0.2s;
+        font-size: 0.9rem;
+        color: var(--text-color);
+        text-decoration: none;
+    }
+
+    .service-btn:hover {
+        border-color: var(--link-color);
+        color: var(--heading-color);
+    }
+
+    .service-btn.connected {
+        border-color: var(--link-color);
+        background-color: var(--table-header-bg-color);
+    }
+
+    .service-btn.unavailable {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    .service-btn.unavailable:hover {
+        border-color: var(--form-border-color);
+        color: var(--text-color);
+    }
+
+    .service-icon { font-size: 2rem; line-height: 1; }
+
+    .service-status { font-size: 0.75rem; color: var(--link-color); }
+
+    .playlist-picker {
+        margin-top: 16px;
+        padding: 16px;
+        background-color: var(--form-bg-color);
+        border: 1px solid var(--form-border-color);
+        border-radius: 8px;
+    }
+
+    .playlist-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-bottom: 4px;
+        transition: background 0.15s;
+    }
+
+    .playlist-item:hover { background-color: var(--table-header-bg-color); }
+
+    .playlist-item.selected {
+        background-color: var(--table-header-bg-color);
+        border: 1px solid var(--link-color);
+    }
+
+    .alert-success {
+        background-color: rgba(60, 140, 80, 0.2);
+        border: 1px solid #3c8c50;
+        color: #aaffbb;
+        padding: 10px 14px;
+        border-radius: 5px;
+        margin-bottom: 16px;
+        text-align: center;
+    }
+
+    .tz-pill {
+        padding: 3px 11px;
+        font-size: 0.77rem;
+        border-radius: 20px;
+        border: 1px solid var(--form-border-color);
+        background: var(--form-bg-color);
+        color: var(--text-color);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: border-color 0.12s, background 0.12s;
+    }
+    .tz-pill:hover { border-color: var(--link-color); color: var(--heading-color); }
+    .tz-pill.active { border-color: var(--link-color); background: rgba(140,136,243,0.12); color: var(--heading-color); }
+</style>
+
+<div class="settings-container">
+
+    <% if (locals.accountFlash === 'updated') { %>
+    <div class="alert-success">Account details updated.</div>
+    <% } else if (locals.accountFlash === 'password_changed') { %>
+    <div class="alert-success">Password changed successfully.</div>
+    <% } %>
+    <% if (locals.accountError) { %>
+    <div class="alert-error">
+        <% if (locals.accountError === 'wrong_password') { %>Incorrect current password.<% } %>
+        <% if (locals.accountError === 'password_mismatch') { %>New passwords do not match.<% } %>
+        <% if (locals.accountError === 'password_short') { %>Password must be at least 6 characters.<% } %>
+        <% if (locals.accountError === 'missing_fields') { %>Name and email are required.<% } %>
+    </div>
+    <% } %>
+    <% if (flash === 'spotify') { %>
+    <div class="alert-success">Spotify connected! Choose a playlist below.</div>
+    <% } %>
+    <% if (flash === 'applemusic') { %>
+    <div class="alert-success">Apple Music connected! Choose a playlist below.</div>
+    <% } %>
+    <% if (error) { %>
+    <div class="alert-error">
+        <% if (error === 'no_client_id') { %>Spotify is unavailable right now. Please try again later.<% } %>
+        <% if (error === 'spotify_denied') { %>Spotify connection was cancelled.<% } %>
+        <% if (error === 'spotify_failed') { %>Couldn't connect to Spotify. Please try again.<% } %>
+        <% if (error === 'am_failed') { %>Couldn't connect to Apple Music. Please try again.<% } %>
+        <% if (error === 'spotify_external_invalid') { %>Enter a valid Spotify playlist link or URI.<% } %>
+        <% if (!['no_client_id','spotify_denied','spotify_failed','am_failed','spotify_external_invalid'].includes(error)) { %>Something went wrong while connecting your music service. Please try again.<% } %>
+    </div>
+    <% } %>
+
+    <!-- Account -->
+    <div style="margin-bottom:36px;">
+        <div class="section-header">
+            <h2>Account</h2>
+            <hr>
+        </div>
+
+        <form method="POST" action="/profile/update" style="margin-bottom:24px;">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" name="name" value="<%= user.name %>" required>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value="<%= user.email %>" required>
+            </div>
+            <button type="submit">Save Changes</button>
+        </form>
+
+        <form method="POST" action="/profile/password" style="margin-bottom:24px;">
+            <div class="form-group">
+                <label>Current password</label>
+                <input type="password" name="currentPassword" required autocomplete="current-password">
+            </div>
+            <div class="form-group">
+                <label>New password</label>
+                <input type="password" name="newPassword" required autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label>Confirm new password</label>
+                <input type="password" name="confirmPassword" required autocomplete="new-password">
+            </div>
+            <button type="submit">Change Password</button>
+        </form>
+
+        <details style="margin-top:8px;">
+            <summary style="color:#c06060;cursor:pointer;font-size:0.9rem;list-style:none;display:flex;align-items:center;gap:6px;">
+                <span>▸</span> Delete account
+            </summary>
+            <div style="margin-top:14px;padding:16px;border:1px solid rgba(180,80,80,0.35);border-radius:8px;">
+                <p style="font-size:0.85rem;color:var(--link-color);margin-bottom:12px;">
+                    This permanently deletes your account, all sessions, and all groups. Enter your password to confirm.
+                </p>
+                <form method="POST" action="/profile/delete" onsubmit="return confirm('Delete your account permanently? This cannot be undone.')">
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" name="confirmPassword" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn-danger">Delete My Account</button>
+                </form>
+            </div>
+        </details>
+    </div>
+
+    <!-- Subscription -->
+    <% if (!locals.hideMonetization) { %>
+    <div style="margin-bottom:36px;">
+        <div class="section-header">
+            <h2>Subscription</h2>
+            <hr>
+        </div>
+        <style>
+            .plan-badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:0.75rem; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; }
+            .plan-free   { background:var(--blockquote-bg-color); color:var(--link-color); border:1px solid var(--form-border-color); }
+            .plan-pro    { background:rgba(74,144,217,0.15); color:#4a90d9; border:1px solid rgba(74,144,217,0.4); }
+            .plan-studio { background:linear-gradient(90deg,rgba(130,80,220,0.15),rgba(74,144,217,0.15)); color:#a07fe0; border:1px solid rgba(130,80,220,0.4); }
+        </style>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <span class="plan-badge plan-<%= locals.userPlan || 'free' %>"><%= locals.userPlan || 'free' %></span>
+            <a href="<%= locals.billingUrl %>" target="_blank" rel="noopener" style="font-size:0.88rem;"><%= locals.isFree ? 'Upgrade Plan' : 'Manage Plan' %></a>
+        </div>
+        <p style="font-size:0.82rem;color:var(--link-color);margin-top:10px;margin-bottom:0;">
+            <% if (locals.isFree) { %>Free: up to 15 sessions, 5 groups, and 5 templates. Upgrade for higher limits.<% } else if (locals.isPro) { %>Pro: up to 100 sessions, 20 groups, and 30 templates.<% } else { %>Studio: unlimited sessions, groups, and templates.<% } %>
+        </p>
+    </div>
+    <% } %>
+
+    <!-- Session Defaults -->
+    <div style="margin-bottom:36px;">
+        <div class="section-header">
+            <h2>Session Defaults</h2>
+            <hr>
+        </div>
+        <form method="POST" action="/settings">
+            <div class="duration-inputs">
+                <div class="form-group">
+                    <label>Default work duration (min)</label>
+                    <input type="number" name="defaultWorkDuration" value="<%= pref.defaultWorkDuration || 25 %>" min="1" max="180">
+                </div>
+                <div class="form-group">
+                    <label>Default break duration (min)</label>
+                    <input type="number" name="defaultBreakDuration" value="<%= pref.defaultBreakDuration || 5 %>" min="1" max="60">
+                </div>
+            </div>
+            <button type="submit">Save Defaults</button>
+        </form>
+
+        <form method="POST" action="/settings" style="margin-top:16px;">
+            <input type="hidden" name="_strictModePresent" value="1">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                <input type="checkbox" name="strictMode" value="on" <%= locals.strictMode ? 'checked' : '' %> onchange="this.form.submit()" style="margin-top:3px;flex-shrink:0;">
+                <span>
+                    <strong>Strict Mode</strong><br>
+                    <span style="font-size:0.85rem;color:var(--link-color);">Can't skip to break or stop the session until all tasks are marked complete.</span>
+                </span>
+            </label>
+        </form>
+    </div>
+
+    <!-- Calendar -->
+    <div style="margin-bottom:36px;">
+        <div class="section-header">
+            <h2>Calendar</h2>
+            <hr>
+        </div>
+        <form method="POST" action="/settings" id="calendarSettingsForm">
+            <input type="hidden" name="timezone" id="tzHiddenInput" value="<%= locals.timezone || '' %>">
+
+            <div class="form-group">
+                <label>Week starts on</label>
+                <select name="startDay" onchange="this.form.submit()">
+                    <option value="monday"    <%= (locals.startDay||'monday')==='monday'    ?'selected':'' %>>Monday</option>
+                    <option value="tuesday"   <%= (locals.startDay||'monday')==='tuesday'   ?'selected':'' %>>Tuesday</option>
+                    <option value="wednesday" <%= (locals.startDay||'monday')==='wednesday' ?'selected':'' %>>Wednesday</option>
+                    <option value="thursday"  <%= (locals.startDay||'monday')==='thursday'  ?'selected':'' %>>Thursday</option>
+                    <option value="friday"    <%= (locals.startDay||'monday')==='friday'    ?'selected':'' %>>Friday</option>
+                    <option value="saturday"  <%= (locals.startDay||'monday')==='saturday'  ?'selected':'' %>>Saturday</option>
+                    <option value="sunday"    <%= (locals.startDay||'monday')==='sunday'    ?'selected':'' %>>Sunday</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+                    <span>Time zone</span>
+                    <span id="tzPreferenceLabel" style="font-weight:normal;font-size:0.78rem;color:var(--link-color);"><%= locals.timezone ? 'Saved: ' + locals.timezone : 'Using device timezone' %></span>
+                </label>
+                <p style="font-size:0.78rem;color:var(--link-color);margin-bottom:10px;">Click the band to pick a UTC offset, then choose a timezone.</p>
+
+                <div style="position:relative;border:1px solid var(--form-border-color);border-radius:8px;overflow:hidden;margin-bottom:8px;">
+                    <canvas id="tzCanvas" style="display:block;width:100%;height:90px;cursor:crosshair;"></canvas>
+                    <div id="tzTooltip" style="position:absolute;top:4px;left:4px;background:var(--blockquote-bg-color);border:1px solid var(--form-border-color);padding:2px 8px;border-radius:4px;font-size:11px;color:var(--text-color);display:none;pointer-events:none;white-space:nowrap;z-index:1;"></div>
+                </div>
+
+                <div id="tzOffsetInfo" style="font-size:0.8rem;color:var(--link-color);min-height:1.4em;margin-bottom:8px;"></div>
+
+                <div id="tzPills" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;max-height:110px;overflow-y:auto;padding:1px 0;"></div>
+
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="tzSearch" placeholder="Search (e.g. Tokyo, Berlin, UTC)…" style="flex:1;min-width:0;">
+                    <button type="button" onclick="detectAndSetTimezone()" style="flex-shrink:0;font-size:0.85rem;padding:8px 14px;">Detect</button>
+                </div>
+
+                <div id="tzCurrentLabel" style="margin-top:8px;font-size:0.85rem;color:var(--heading-color);">
+                    <%= locals.timezone || 'Detecting device timezone...' %>
+                </div>
+            </div>
+
+            <button type="submit">Save Calendar Settings</button>
+        </form>
+    </div>
+
+    <!-- App Rules -->
+    <div style="margin-bottom:36px;">
+        <div class="section-header">
+            <h2>App Rules</h2>
+            <hr>
+        </div>
+        <p style="font-size:0.85rem;color:var(--link-color);margin-bottom:20px;">Allowed apps appear as quick links during focus sessions. Blocked apps are hidden from the switcher while a session is running. Desktop apps use a URI scheme (e.g. <code>spotify:</code>, <code>vscode://</code>).</p>
+
+        <h3 style="font-size:1rem;margin-bottom:12px;">Allowed</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
+            <% (locals.whitelistedApps || []).forEach(function(app, i) { %>
+            <div style="position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:80px;height:80px;background:var(--form-bg-color);border:1px solid var(--form-border-color);border-radius:16px;padding:8px;gap:4px;text-align:center;">
+                <form method="POST" action="/settings/whitelist" style="position:absolute;top:4px;right:4px;margin:0;">
+                    <input type="hidden" name="action" value="remove">
+                    <input type="hidden" name="index" value="<%= i %>">
+                    <button type="submit" style="background:none;border:none;font-size:0.7rem;cursor:pointer;padding:2px 4px;opacity:0.7;color:var(--text-color);" title="Remove">Remove</button>
+                </form>
+                <span style="font-size:0.75rem;line-height:1;"><%= app.appType === 'app' ? 'APP' : 'WEB' %></span>
+                <span style="font-size:0.65rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;"><%= app.name %></span>
+            </div>
+            <% }); %>
+        </div>
+        <% if (!(locals.whitelistedApps && whitelistedApps.length > 0)) { %>
+        <p style="font-size:0.8rem;opacity:0.5;margin-bottom:4px;">None added.</p>
+        <% } %>
+        <details style="margin-top:10px;margin-bottom:24px;">
+            <summary style="cursor:pointer;font-size:0.82rem;color:var(--link-color);">+ Add allowed app</summary>
+            <form method="POST" action="/settings/whitelist" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;">
+                <input type="hidden" name="action" value="add">
+                <div class="form-group" style="margin:0;flex:1;min-width:100px;">
+                    <label style="font-size:0.75rem;">Name</label>
+                    <input type="text" name="name" placeholder="e.g. Spotify" required>
+                </div>
+                <div class="form-group" style="margin:0;min-width:110px;">
+                    <label style="font-size:0.75rem;">Type</label>
+                    <select name="appType" onchange="toggleAppPicker(this)">
+                        <option value="website">Website</option>
+                        <option value="app">Desktop App</option>
+                    </select>
+                </div>
+                <div class="popular-apps-picker" style="display:none;width:100%;margin-top:2px;">
+                    <p style="font-size:0.7rem;opacity:0.5;margin:0 0 5px;">Quick pick:</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                        <button type="button" onclick="pickApp(this,'Spotify','spotify:')">Spotify</button>
+                        <button type="button" onclick="pickApp(this,'VS Code','vscode:')">VS Code</button>
+                        <button type="button" onclick="pickApp(this,'Slack','slack:')">Slack</button>
+                        <button type="button" onclick="pickApp(this,'Discord','discord:')">Discord</button>
+                        <button type="button" onclick="pickApp(this,'Notion','notion:')">Notion</button>
+                        <button type="button" onclick="pickApp(this,'Zoom','zoommtg:')">Zoom</button>
+                        <button type="button" onclick="pickApp(this,'Figma','figma:')">Figma</button>
+                        <button type="button" onclick="pickApp(this,'Obsidian','obsidian:')">Obsidian</button>
+                    </div>
+                </div>
+                <div class="form-group" style="margin:0;flex:2;min-width:150px;">
+                    <label style="font-size:0.75rem;">URL</label>
+                    <input type="text" name="url" placeholder="https://…" required>
+                </div>
+                <button type="submit" style="flex-shrink:0;">Add</button>
+            </form>
+        </details>
+
+        <h3 style="font-size:1rem;margin-bottom:12px;">Blocked</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
+            <% (locals.blacklistedApps || []).forEach(function(app, i) { %>
+            <div style="position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:80px;height:80px;background:var(--form-bg-color);border:1px solid var(--form-border-color);border-radius:16px;padding:8px;gap:4px;text-align:center;opacity:0.75;">
+                <form method="POST" action="/settings/blacklist" style="position:absolute;top:4px;right:4px;margin:0;">
+                    <input type="hidden" name="action" value="remove">
+                    <input type="hidden" name="index" value="<%= i %>">
+                    <button type="submit" style="background:none;border:none;font-size:0.7rem;cursor:pointer;padding:2px 4px;opacity:0.7;color:var(--text-color);" title="Remove">Remove</button>
+                </form>
+                <span style="font-size:0.75rem;line-height:1;"><%= app.appType === 'app' ? 'APP' : 'WEB' %></span>
+                <span style="font-size:0.65rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;"><%= app.name %></span>
+            </div>
+            <% }); %>
+        </div>
+        <% if (!(locals.blacklistedApps && blacklistedApps.length > 0)) { %>
+        <p style="font-size:0.8rem;opacity:0.5;margin-bottom:4px;">None blocked.</p>
+        <% } %>
+        <details style="margin-top:10px;">
+            <summary style="cursor:pointer;font-size:0.82rem;color:var(--link-color);">+ Add blocked app</summary>
+            <form method="POST" action="/settings/blacklist" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;">
+                <input type="hidden" name="action" value="add">
+                <div class="form-group" style="margin:0;flex:1;min-width:100px;">
+                    <label style="font-size:0.75rem;">Name</label>
+                    <input type="text" name="name" placeholder="e.g. YouTube" required>
+                </div>
+                <div class="form-group" style="margin:0;min-width:110px;">
+                    <label style="font-size:0.75rem;">Type</label>
+                    <select name="appType" onchange="toggleAppPicker(this)">
+                        <option value="website">Website</option>
+                        <option value="app">Desktop App</option>
+                    </select>
+                </div>
+                <div class="popular-apps-picker" style="display:none;width:100%;margin-top:2px;">
+                    <p style="font-size:0.7rem;opacity:0.5;margin:0 0 5px;">Quick pick:</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                        <button type="button" onclick="pickApp(this,'Spotify','spotify:')">Spotify</button>
+                        <button type="button" onclick="pickApp(this,'VS Code','vscode:')">VS Code</button>
+                        <button type="button" onclick="pickApp(this,'Slack','slack:')">Slack</button>
+                        <button type="button" onclick="pickApp(this,'Discord','discord:')">Discord</button>
+                        <button type="button" onclick="pickApp(this,'Notion','notion:')">Notion</button>
+                        <button type="button" onclick="pickApp(this,'Zoom','zoommtg:')">Zoom</button>
+                        <button type="button" onclick="pickApp(this,'Figma','figma:')">Figma</button>
+                        <button type="button" onclick="pickApp(this,'Obsidian','obsidian:')">Obsidian</button>
+                    </div>
+                </div>
+                <div class="form-group" style="margin:0;flex:2;min-width:150px;">
+                    <label style="font-size:0.75rem;">URL</label>
+                    <input type="text" name="url" placeholder="https://…" required>
+                </div>
+                <button type="submit" style="flex-shrink:0;">Block</button>
+            </form>
+        </details>
+    </div>
+
+    <!-- Music -->
+    <div>
+        <div class="section-header">
+            <h2>Music</h2>
+            <hr>
+        </div>
+        <p style="font-size:0.9rem;color:var(--link-color);margin-bottom:12px;">Connect a service to play music during sessions. Requires a premium subscription for full-track playback.</p>
+
+        <div class="service-grid">
+
+            <!-- Spotify -->
+            <% if (spotifyConnected) { %>
+            <div class="service-btn connected">
+                <ion-icon class="service-icon" name="logo-spotify" aria-label="Spotify"></ion-icon>
+                <span>Spotify</span>
+                <span class="service-status"><%= pref.musicService === 'spotify' ? 'Active' : 'Connected' %></span>
+            </div>
+            <% } %>
+            <% if (spotifyExternalConnected) { %>
+            <div class="service-btn connected">
+                <ion-icon class="service-icon" name="logo-spotify" aria-label="Spotify"></ion-icon>
+                <span>Spotify</span>
+                <span class="service-status"><%= pref.musicService === 'spotifyExternal' ? 'External' : 'Playlist saved' %></span>
+            </div>
+            <% } %>
+
+            <!-- Apple Music -->
+            <% if (appleMusicConnected) { %>
+            <div class="service-btn connected">
+                <span class="service-icon">AM</span>
+                <span>Apple Music</span>
+                <span class="service-status"><%= pref.musicService === 'applemusic' ? 'Active' : 'Connected' %></span>
+            </div>
+            <% } %>
+
+            <!-- Deezer -->
+            <% if (deezerActive) { %>
+            <div class="service-btn connected">
+                <span class="service-icon">DZ</span>
+                <span>Deezer</span>
+                <span class="service-status">Active</span>
+            </div>
+            <% } %>
+        </div>
+
+        <% if (!spotifyConnected && !spotifyExternalConnected && !appleMusicConnected && !deezerActive) { %>
+        <p style="font-size:0.85rem;color:var(--link-color);margin-top:12px;">No music services are connected yet.</p>
+        <% } %>
+
+        <% if ((!spotifyConnected && spotifyClientId) || (!appleMusicConnected && appleMusicKeyId) || (!deezerActive && deezerAppId)) { %>
+        <details style="margin-top:16px;" <%= (!spotifyConnected && !appleMusicConnected && !deezerActive) ? 'open' : '' %>>
+            <summary style="cursor:pointer;font-size:0.85rem;color:var(--link-color);">Connect a music service</summary>
+            <div class="service-grid" style="margin-top:12px;">
+                <% if (!spotifyConnected && spotifyClientId) { %>
+                <a href="/auth/spotify" class="service-btn">
+                    <ion-icon class="service-icon" name="play-circle" aria-label="Spotify"></ion-icon>
+                    <span>Spotify</span>
+                    <span class="service-status">Connect</span>
+                </a>
+                <% } %>
+                <% if (!appleMusicConnected && appleMusicKeyId) { %>
+                <button class="service-btn" onclick="connectAppleMusic()" type="button">
+                    <span class="service-icon">AM</span>
+                    <span>Apple Music</span>
+                    <span class="service-status">Connect</span>
+                </button>
+                <% } %>
+                <% if (!deezerActive && deezerAppId) { %>
+                <button class="service-btn" onclick="connectDeezer()" type="button" id="deezerConnectBtn">
+                    <span class="service-icon">DZ</span>
+                    <span>Deezer</span>
+                    <span class="service-status">Connect</span>
+                </button>
+                <% } %>
+            </div>
+        </details>
+        <% } %>
+
+        <details style="margin-top:12px;" <%= spotifyExternalConnected ? '' : 'open' %>>
+            <summary style="cursor:pointer;font-size:0.85rem;color:var(--link-color);">Use Spotify without connecting an account</summary>
+            <form method="POST" action="/settings" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;">
+                <input type="hidden" name="_musicAction" value="saveSpotifyExternal">
+                <div class="form-group" style="margin:0;flex:1;min-width:220px;">
+                    <label for="spotifyExternalPlaylist">Spotify playlist link or URI</label>
+                    <input id="spotifyExternalPlaylist" name="spotifyExternalPlaylist" type="text" maxlength="512" value="<%= spotifyExternalConnected ? 'spotify:playlist:' + pref.spotifyExternalPlaylistId : '' %>" placeholder="https://open.spotify.com/playlist/..." autocomplete="off">
+                </div>
+                <button type="submit">Use playlist</button>
+                <% if (spotifyExternalConnected) { %>
+                <button type="submit" name="removeSpotifyExternal" value="true" style="background:transparent;border:1px solid var(--form-border-color);color:var(--text-color);">Remove</button>
+                <% } %>
+            </form>
+            <p style="font-size:0.8rem;color:var(--link-color);margin-top:8px;">Serenity opens the playlist in Spotify; playback and controls stay in the Spotify app or web player.</p>
+        </details>
+
+        <!-- Spotify playlist picker -->
+        <% if (spotifyConnected) { %>
+        <div class="playlist-picker">
+            <p style="color:var(--heading-color);margin-bottom:10px;font-size:0.95rem;">
+                Spotify playlist: <strong id="selectedName"><%= pref.musicService === 'spotify' && pref.musicPlaylistName ? pref.musicPlaylistName : 'None selected' %></strong>
+            </p>
+            <button type="button" onclick="loadSpotifyPlaylists()" style="margin-bottom:12px;">Browse Playlists</button>
+            <input type="text" id="spotifySearch" placeholder="Search playlists..." oninput="filterSpotifyList(this.value)" style="width:100%;margin-bottom:10px;display:none;box-sizing:border-box;">
+
+            <% if (spotifyPlaylists.length > 0) { %>
+            <div id="spotifyPlaylistList">
+                <%
+                const _focusKw = ['work','study','school','lock in'];
+                const _isFocus = name => _focusKw.some(kw => name.toLowerCase().includes(kw));
+                const _sorted = [...spotifyPlaylists].sort((a,b) => {
+                    const af = _isFocus(a.name), bf = _isFocus(b.name);
+                    if (af && !bf) return -1;
+                    if (!af && bf) return 1;
+                    return 0;
+                });
+                %>
+                <% _sorted.forEach(function(pl) { %>
+                <div class="playlist-item<%= pref.musicService === 'spotify' && pref.musicPlaylistId === pl.id ? ' selected' : '' %>"
+                     data-name="<%= pl.name.toLowerCase() %>"
+                     onclick="selectPlaylist('spotify', '<%= pl.id %>', '<%= pl.name.replace(/'/g, "\\'") %>')">
+                    <%= pl.name %>
+                    <% if (pl.tracks) { %>
+                    <span style="font-size:0.8rem;color:var(--link-color);margin-left:auto;"><%= pl.tracks.total %> tracks</span>
+                    <% } %>
+                </div>
+                <% }); %>
+            </div>
+            <% } else { %>
+            <div id="spotifyPlaylistList"></div>
+            <% } %>
+        </div>
+
+        <form method="POST" action="/auth/spotify/disconnect" style="margin-top:12px;">
+            <button type="submit" class="btn-danger btn-sm">Disconnect Spotify</button>
+        </form>
+        <% } %>
+
+        <!-- Apple Music playlist picker -->
+        <% if (appleMusicConnected) { %>
+        <div class="playlist-picker">
+            <p style="color:var(--heading-color);margin-bottom:10px;font-size:0.95rem;">
+                Apple Music playlist: <strong><%= pref.musicService === 'applemusic' && pref.musicPlaylistName ? pref.musicPlaylistName : 'None selected' %></strong>
+            </p>
+            <button type="button" onclick="loadAppleMusicPlaylists()" style="margin-bottom:12px;">Browse Playlists</button>
+            <input type="text" id="appleMusicSearch" placeholder="Search playlists..." oninput="filterPlaylistList('appleMusicPlaylistList', this.value)" style="width:100%;margin-bottom:10px;display:none;box-sizing:border-box;">
+            <div id="appleMusicPlaylistList"></div>
+        </div>
+
+        <form method="POST" action="/auth/applemusic/disconnect" style="margin-top:12px;">
+            <button type="submit" class="btn-danger btn-sm">Disconnect Apple Music</button>
+        </form>
+        <% } %>
+
+        <!-- Deezer playlist picker -->
+        <% if (deezerActive) { %>
+        <div class="playlist-picker">
+            <p style="color:var(--heading-color);margin-bottom:10px;font-size:0.95rem;">
+                Deezer playlist: <strong><%= pref.musicPlaylistName || 'None selected' %></strong>
+            </p>
+            <button type="button" onclick="changeDeezerPlaylist()" style="margin-bottom:12px;">Change Playlist</button>
+            <input type="text" id="deezerSearch" placeholder="Search playlists..." oninput="filterPlaylistList('deezerPlaylistList', this.value)" style="width:100%;margin-bottom:10px;display:none;box-sizing:border-box;">
+            <div id="deezerPlaylistList"></div>
+        </div>
+
+        <form method="POST" action="/auth/deezer/disconnect" style="margin-top:12px;">
+            <button type="submit" class="btn-danger btn-sm">Disconnect Deezer</button>
+        </form>
+        <% } %>
+
+        <!-- Deezer inline playlist picker (shown after connecting) -->
+        <div id="deezerConnectSection" style="display:none;" class="playlist-picker">
+            <p style="color:var(--heading-color);margin-bottom:10px;font-size:0.95rem;">Choose a Deezer playlist:</p>
+            <div id="deezerPickList"></div>
+        </div>
+
+    </div>
+
+    <!-- Hidden playlist save form -->
+    <form method="POST" action="/settings" id="playlistForm" style="display:none;">
+        <input type="hidden" name="musicPlaylistId" id="playlistIdInput">
+        <input type="hidden" name="musicPlaylistName" id="playlistNameInput">
+        <input type="hidden" name="musicService" id="playlistServiceInput">
+    </form>
+
+</div>
+
+<!-- DZ.js for Deezer (only if app ID configured) -->
+<% if (deezerAppId) { %>
+<div id="dzSettingsPlayer" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;"></div>
+<script src="https://e-cdns-files.dzcdn.net/js/min/dz.js"></script>
+<% } %>
+
+<!-- MusicKit JS for Apple Music (only if configured) -->
+<% if (appleMusicKeyId) { %>
+<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" data-web-components async></script>
+<% } %>
+
+<script>
+    // ── Playlist helpers ──────────────────────────────────────────────────────
+    const FOCUS_KW = ['work', 'study', 'school', 'lock in'];
+
+    function sortPlaylists(list, nameGetter) {
+        const isFocus = p => FOCUS_KW.some(kw => nameGetter(p).toLowerCase().includes(kw));
+        return [...list.filter(isFocus), ...list.filter(p => !isFocus(p))];
+    }
+
+    function filterPlaylistList(containerId, q) {
+        const lq = q.toLowerCase();
+        document.querySelectorAll('#' + containerId + ' .playlist-item').forEach(el => {
+            const name = (el.dataset.name || el.textContent).toLowerCase();
+            el.style.display = (!lq || name.includes(lq)) ? '' : 'none';
+        });
+    }
+
+    function filterSpotifyList(q) {
+        filterPlaylistList('spotifyPlaylistList', q);
+    }
+
+    function selectPlaylist(service, id, name) {
+        document.getElementById('playlistIdInput').value = id;
+        document.getElementById('playlistNameInput').value = name;
+        document.getElementById('playlistServiceInput').value = service;
+        document.getElementById('playlistForm').submit();
+    }
+
+    // ── Spotify ───────────────────────────────────────────────────────────────
+    async function loadSpotifyPlaylists() {
+        const container = document.getElementById('spotifyPlaylistList');
+        const searchEl = document.getElementById('spotifySearch');
+        container.innerHTML = '<p style="color:var(--link-color);font-size:0.9rem;">Loading...</p>';
+        try {
+            const res = await fetch('/api/spotify/playlists');
+            const data = await res.json();
+            const sorted = sortPlaylists(data.playlists || [], p => p.name);
+            container.innerHTML = '';
+            if (sorted.length === 0) {
+                container.innerHTML = '<p style="color:var(--link-color);font-size:0.9rem;">No playlists found.</p>';
+                return;
+            }
+            if (searchEl) searchEl.style.display = '';
+            const currentId = '<%= pref.musicService === "spotify" ? (pref.musicPlaylistId || "") : "" %>';
+            sorted.forEach(pl => {
+                const item = document.createElement('div');
+                item.className = 'playlist-item' + (pl.id === currentId ? ' selected' : '');
+                item.dataset.name = pl.name.toLowerCase();
+                item.appendChild(document.createTextNode(pl.name));
+                if (pl.tracks) {
+                    const meta = document.createElement('span');
+                    meta.style.cssText = 'font-size:0.8rem;color:var(--link-color);margin-left:auto;';
+                    meta.textContent = pl.tracks.total + ' tracks';
+                    item.appendChild(meta);
+                }
+                item.onclick = () => selectPlaylist('spotify', pl.id, pl.name);
+                container.appendChild(item);
+            });
+        } catch(e) {
+            container.innerHTML = '<p style="color:#ffaaaa;font-size:0.9rem;">Could not load playlists. Please try again.</p>';
+        }
+    }
+
+    // ── Apple Music ───────────────────────────────────────────────────────────
+    let _amInstance = null;
+
+    async function _ensureAppleMusic() {
+        if (_amInstance) return _amInstance;
+        const res = await fetch('/api/applemusic/developer-token');
+        if (!res.ok) throw new Error('Developer token unavailable');
+        const { token } = await res.json();
+        await MusicKit.configure({ developerToken: token, app: { name: 'Serenity', build: '1.0.0' } });
+        _amInstance = MusicKit.getInstance();
+        return _amInstance;
+    }
+
+    async function connectAppleMusic() {
+        try {
+            const music = await _ensureAppleMusic();
+            await music.authorize();
+            const userToken = music.musicUserToken;
+            if (!userToken) throw new Error('No user token returned');
+            await fetch('/api/applemusic/usertoken', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userToken })
+            });
+            window.location.href = '/settings?connected=applemusic';
+        } catch(e) {
+            alert('Could not connect to Apple Music. Please try again.');
+        }
+    }
+
+    async function loadAppleMusicPlaylists() {
+        const container = document.getElementById('appleMusicPlaylistList');
+        const searchEl = document.getElementById('appleMusicSearch');
+        container.innerHTML = '<p style="color:var(--link-color);font-size:0.9rem;">Loading...</p>';
+        try {
+            const music = await _ensureAppleMusic();
+            if (!music.isAuthorized) await music.authorize();
+            const response = await music.api.music('/v1/me/library/playlists', { limit: 100 });
+            const raw = (response && response.data && response.data.data) ? response.data.data : [];
+            const sorted = sortPlaylists(raw, p => p.attributes.name);
+            container.innerHTML = '';
+            if (sorted.length === 0) {
+                container.innerHTML = '<p style="color:var(--link-color);font-size:0.9rem;">No playlists found in your library.</p>';
+                return;
+            }
+            if (searchEl) searchEl.style.display = '';
+            const currentId = '<%= pref.musicService === "applemusic" ? (pref.musicPlaylistId || "") : "" %>';
+            sorted.forEach(pl => {
+                const item = document.createElement('div');
+                item.className = 'playlist-item' + (pl.id === currentId ? ' selected' : '');
+                item.dataset.name = pl.attributes.name.toLowerCase();
+                item.appendChild(document.createTextNode(pl.attributes.name));
+                const meta = document.createElement('span');
+                meta.style.cssText = 'font-size:0.8rem;color:var(--link-color);margin-left:auto;';
+                meta.textContent = (pl.attributes.trackCount || 0) + ' tracks';
+                item.appendChild(meta);
+                item.onclick = () => selectPlaylist('applemusic', pl.id, pl.attributes.name);
+                container.appendChild(item);
+            });
+        } catch(e) {
+            container.innerHTML = '<p style="color:#ffaaaa;font-size:0.9rem;">Could not load playlists. Please try again.</p>';
+        }
+    }
+
+    // ── Deezer ────────────────────────────────────────────────────────────────
+    <% if (deezerAppId) { %>
+    let _deezerInited = false;
+
+    function _initDeezer(withPlayer) {
+        if (_deezerInited) return;
+        _deezerInited = true;
+        const cfg = {
+            appId: '<%= deezerAppId %>',
+            channelUrl: window.location.origin + '/deezer/channel'
+        };
+        if (withPlayer) {
+            cfg.player = { container: 'dzSettingsPlayer', width: 0, height: 0 };
+        }
+        DZ.init(cfg);
+    }
+
+    function _renderDeezerPlaylists(playlists, containerId, searchElId) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        if (!playlists || playlists.length === 0) {
+            container.innerHTML = '<p style="color:var(--link-color);font-size:0.9rem;">No playlists found.</p>';
+            return;
+        }
+        const sorted = sortPlaylists(playlists, p => p.title);
+        const searchEl = searchElId ? document.getElementById(searchElId) : null;
+        if (searchEl) searchEl.style.display = '';
+        sorted.forEach(pl => {
+            const item = document.createElement('div');
+            item.className = 'playlist-item';
+            item.dataset.name = pl.title.toLowerCase();
+            item.appendChild(document.createTextNode(pl.title));
+            const meta = document.createElement('span');
+            meta.style.cssText = 'font-size:0.8rem;color:var(--link-color);margin-left:auto;';
+            meta.textContent = (pl.nb_tracks || 0) + ' tracks';
+            item.appendChild(meta);
+            item.onclick = () => selectPlaylist('deezer', String(pl.id), pl.title);
+            container.appendChild(item);
+        });
+    }
+
+    function connectDeezer() {
+        _initDeezer(false);
+        DZ.login(function(response) {
+            if (!response.authResponse) {
+                alert('Deezer connection was cancelled or could not be completed. Please try again.');
+                return;
+            }
+            DZ.api('/user/me/playlists', function(data) {
+                document.getElementById('deezerConnectSection').style.display = 'block';
+                _renderDeezerPlaylists(data.data, 'deezerPickList', null);
+            });
+        }, { perms: 'basic_access,manage_library' });
+    }
+
+    function changeDeezerPlaylist() {
+        _initDeezer(false);
+        DZ.login(function(response) {
+            if (!response.authResponse) {
+                alert('Deezer connection was cancelled or could not be completed. Please try again.');
+                return;
+            }
+            DZ.api('/user/me/playlists', function(data) {
+                document.getElementById('deezerConnectSection').style.display = 'block';
+                _renderDeezerPlaylists(data.data, 'deezerPlaylistList', 'deezerSearch');
+            });
+        }, { perms: 'basic_access,manage_library' });
+    }
+    <% } %>
+
+    // ── Timezone interactive band picker ──────────────────────────────────────
+    (function () {
+        var MIN_OFF = -12, MAX_OFF = 14, RANGE = MAX_OFF - MIN_OFF;
+
+        var TZ_DATA = {
+            '-12':  ['Etc/GMT+12'],
+            '-11':  ['Pacific/Pago_Pago','Pacific/Niue'],
+            '-10':  ['Pacific/Honolulu','Pacific/Rarotonga'],
+            '-9.5': ['Pacific/Marquesas'],
+            '-9':   ['America/Anchorage','America/Juneau'],
+            '-8':   ['America/Los_Angeles','America/Vancouver','America/Tijuana'],
+            '-7':   ['America/Denver','America/Phoenix','America/Edmonton','America/Mazatlan'],
+            '-6':   ['America/Chicago','America/Mexico_City','America/Winnipeg','America/Guatemala'],
+            '-5':   ['America/New_York','America/Toronto','America/Lima','America/Bogota','America/Havana'],
+            '-4':   ['America/Halifax','America/Caracas','America/Santiago','America/La_Paz'],
+            '-3.5': ['America/St_Johns'],
+            '-3':   ['America/Sao_Paulo','America/Argentina/Buenos_Aires','America/Fortaleza'],
+            '-2':   ['America/Noronha','Etc/GMT+2'],
+            '-1':   ['Atlantic/Azores','Atlantic/Cape_Verde'],
+            '0':    ['UTC','Europe/London','Atlantic/Reykjavik','Africa/Abidjan'],
+            '1':    ['Europe/Paris','Europe/Berlin','Europe/Rome','Europe/Madrid','Africa/Lagos'],
+            '2':    ['Europe/Athens','Europe/Helsinki','Africa/Cairo','Africa/Johannesburg','Asia/Jerusalem'],
+            '3':    ['Europe/Moscow','Asia/Baghdad','Africa/Nairobi','Asia/Riyadh'],
+            '3.5':  ['Asia/Tehran'],
+            '4':    ['Asia/Dubai','Asia/Baku','Asia/Tbilisi','Indian/Mauritius'],
+            '4.5':  ['Asia/Kabul'],
+            '5':    ['Asia/Karachi','Asia/Tashkent'],
+            '5.5':  ['Asia/Kolkata','Asia/Colombo'],
+            '5.75': ['Asia/Kathmandu'],
+            '6':    ['Asia/Dhaka','Asia/Almaty'],
+            '6.5':  ['Asia/Yangon'],
+            '7':    ['Asia/Bangkok','Asia/Jakarta','Asia/Ho_Chi_Minh'],
+            '8':    ['Asia/Shanghai','Asia/Singapore','Asia/Hong_Kong','Australia/Perth','Asia/Taipei'],
+            '9':    ['Asia/Tokyo','Asia/Seoul'],
+            '9.5':  ['Australia/Adelaide','Australia/Darwin'],
+            '10':   ['Australia/Sydney','Australia/Melbourne','Pacific/Port_Moresby'],
+            '11':   ['Pacific/Guadalcanal','Pacific/Noumea'],
+            '12':   ['Pacific/Auckland','Pacific/Fiji'],
+            '12.75':['Pacific/Chatham'],
+            '13':   ['Pacific/Apia','Pacific/Tongatapu'],
+            '14':   ['Pacific/Kiritimati']
+        };
+
+        var VALID_OFFS = Object.keys(TZ_DATA).map(parseFloat).sort(function(a,b){return a-b;});
+
+        var CITIES = [
+            {n:'Honolulu',  o:-10}, {n:'Anchorage',  o:-9},  {n:'LA',       o:-8},
+            {n:'Denver',    o:-7},  {n:'Chicago',    o:-6},  {n:'New York',  o:-5},
+            {n:'São Paulo', o:-3},  {n:'London',     o:0},   {n:'Paris',     o:1},
+            {n:'Cairo',     o:2},   {n:'Moscow',     o:3},   {n:'Dubai',     o:4},
+            {n:'Kolkata',   o:5.5}, {n:'Bangkok',    o:7},   {n:'Shanghai',  o:8},
+            {n:'Tokyo',     o:9},   {n:'Sydney',     o:10},  {n:'Auckland',  o:12}
+        ];
+
+        // City → IANA timezone lookup for search
+        var CITY_TZ = [
+            {n:'Honolulu',         iana:'Pacific/Honolulu'},
+            {n:'Anchorage',        iana:'America/Anchorage'},
+            {n:'Los Angeles',      iana:'America/Los_Angeles'},
+            {n:'Vancouver',        iana:'America/Vancouver'},
+            {n:'Seattle',          iana:'America/Los_Angeles'},
+            {n:'San Francisco',    iana:'America/Los_Angeles'},
+            {n:'Las Vegas',        iana:'America/Los_Angeles'},
+            {n:'Phoenix',          iana:'America/Phoenix'},
+            {n:'Denver',           iana:'America/Denver'},
+            {n:'Calgary',          iana:'America/Edmonton'},
+            {n:'Chicago',          iana:'America/Chicago'},
+            {n:'Houston',          iana:'America/Chicago'},
+            {n:'Dallas',           iana:'America/Chicago'},
+            {n:'Minneapolis',      iana:'America/Chicago'},
+            {n:'Mexico City',      iana:'America/Mexico_City'},
+            {n:'New York',         iana:'America/New_York'},
+            {n:'Toronto',          iana:'America/Toronto'},
+            {n:'Miami',            iana:'America/New_York'},
+            {n:'Boston',           iana:'America/New_York'},
+            {n:'Atlanta',          iana:'America/New_York'},
+            {n:'Detroit',          iana:'America/Detroit'},
+            {n:'Lima',             iana:'America/Lima'},
+            {n:'Bogota',           iana:'America/Bogota'},
+            {n:'Havana',           iana:'America/Havana'},
+            {n:'Halifax',          iana:'America/Halifax'},
+            {n:'Caracas',          iana:'America/Caracas'},
+            {n:'Santiago',         iana:'America/Santiago'},
+            {n:'La Paz',           iana:'America/La_Paz'},
+            {n:'Sao Paulo',        iana:'America/Sao_Paulo'},
+            {n:'Buenos Aires',     iana:'America/Argentina/Buenos_Aires'},
+            {n:'Montevideo',       iana:'America/Montevideo'},
+            {n:'Azores',           iana:'Atlantic/Azores'},
+            {n:'Cape Verde',       iana:'Atlantic/Cape_Verde'},
+            {n:'London',           iana:'Europe/London'},
+            {n:'Dublin',           iana:'Europe/Dublin'},
+            {n:'Lisbon',           iana:'Europe/Lisbon'},
+            {n:'Reykjavik',        iana:'Atlantic/Reykjavik'},
+            {n:'Paris',            iana:'Europe/Paris'},
+            {n:'Berlin',           iana:'Europe/Berlin'},
+            {n:'Madrid',           iana:'Europe/Madrid'},
+            {n:'Barcelona',        iana:'Europe/Madrid'},
+            {n:'Rome',             iana:'Europe/Rome'},
+            {n:'Milan',            iana:'Europe/Rome'},
+            {n:'Amsterdam',        iana:'Europe/Amsterdam'},
+            {n:'Brussels',         iana:'Europe/Brussels'},
+            {n:'Vienna',           iana:'Europe/Vienna'},
+            {n:'Zurich',           iana:'Europe/Zurich'},
+            {n:'Stockholm',        iana:'Europe/Stockholm'},
+            {n:'Oslo',             iana:'Europe/Oslo'},
+            {n:'Copenhagen',       iana:'Europe/Copenhagen'},
+            {n:'Warsaw',           iana:'Europe/Warsaw'},
+            {n:'Prague',           iana:'Europe/Prague'},
+            {n:'Budapest',         iana:'Europe/Budapest'},
+            {n:'Bratislava',       iana:'Europe/Bratislava'},
+            {n:'Athens',           iana:'Europe/Athens'},
+            {n:'Helsinki',         iana:'Europe/Helsinki'},
+            {n:'Bucharest',        iana:'Europe/Bucharest'},
+            {n:'Sofia',            iana:'Europe/Sofia'},
+            {n:'Kyiv',             iana:'Europe/Kyiv'},
+            {n:'Vilnius',          iana:'Europe/Vilnius'},
+            {n:'Riga',             iana:'Europe/Riga'},
+            {n:'Tallinn',          iana:'Europe/Tallinn'},
+            {n:'Cairo',            iana:'Africa/Cairo'},
+            {n:'Johannesburg',     iana:'Africa/Johannesburg'},
+            {n:'Cape Town',        iana:'Africa/Johannesburg'},
+            {n:'Nairobi',          iana:'Africa/Nairobi'},
+            {n:'Lagos',            iana:'Africa/Lagos'},
+            {n:'Casablanca',       iana:'Africa/Casablanca'},
+            {n:'Accra',            iana:'Africa/Accra'},
+            {n:'Addis Ababa',      iana:'Africa/Addis_Ababa'},
+            {n:'Dar es Salaam',    iana:'Africa/Dar_es_Salaam'},
+            {n:'Khartoum',         iana:'Africa/Khartoum'},
+            {n:'Riyadh',           iana:'Asia/Riyadh'},
+            {n:'Jeddah',           iana:'Asia/Riyadh'},
+            {n:'Baghdad',          iana:'Asia/Baghdad'},
+            {n:'Tehran',           iana:'Asia/Tehran'},
+            {n:'Dubai',            iana:'Asia/Dubai'},
+            {n:'Abu Dhabi',        iana:'Asia/Dubai'},
+            {n:'Istanbul',         iana:'Europe/Istanbul'},
+            {n:'Jerusalem',        iana:'Asia/Jerusalem'},
+            {n:'Tel Aviv',         iana:'Asia/Jerusalem'},
+            {n:'Amman',            iana:'Asia/Amman'},
+            {n:'Beirut',           iana:'Asia/Beirut'},
+            {n:'Kuwait City',      iana:'Asia/Kuwait'},
+            {n:'Doha',             iana:'Asia/Qatar'},
+            {n:'Muscat',           iana:'Asia/Muscat'},
+            {n:'Moscow',           iana:'Europe/Moscow'},
+            {n:'Saint Petersburg', iana:'Europe/Moscow'},
+            {n:'Yekaterinburg',    iana:'Asia/Yekaterinburg'},
+            {n:'Almaty',           iana:'Asia/Almaty'},
+            {n:'Tashkent',         iana:'Asia/Tashkent'},
+            {n:'Baku',             iana:'Asia/Baku'},
+            {n:'Tbilisi',          iana:'Asia/Tbilisi'},
+            {n:'Yerevan',          iana:'Asia/Yerevan'},
+            {n:'Novosibirsk',      iana:'Asia/Novosibirsk'},
+            {n:'Vladivostok',      iana:'Asia/Vladivostok'},
+            {n:'Kabul',            iana:'Asia/Kabul'},
+            {n:'Karachi',          iana:'Asia/Karachi'},
+            {n:'Islamabad',        iana:'Asia/Karachi'},
+            {n:'Lahore',           iana:'Asia/Karachi'},
+            {n:'Mumbai',           iana:'Asia/Kolkata'},
+            {n:'New Delhi',        iana:'Asia/Kolkata'},
+            {n:'Kolkata',          iana:'Asia/Kolkata'},
+            {n:'Chennai',          iana:'Asia/Kolkata'},
+            {n:'Bangalore',        iana:'Asia/Kolkata'},
+            {n:'Hyderabad',        iana:'Asia/Kolkata'},
+            {n:'Colombo',          iana:'Asia/Colombo'},
+            {n:'Kathmandu',        iana:'Asia/Kathmandu'},
+            {n:'Dhaka',            iana:'Asia/Dhaka'},
+            {n:'Yangon',           iana:'Asia/Yangon'},
+            {n:'Bangkok',          iana:'Asia/Bangkok'},
+            {n:'Jakarta',          iana:'Asia/Jakarta'},
+            {n:'Ho Chi Minh City', iana:'Asia/Ho_Chi_Minh'},
+            {n:'Hanoi',            iana:'Asia/Bangkok'},
+            {n:'Phnom Penh',       iana:'Asia/Phnom_Penh'},
+            {n:'Vientiane',        iana:'Asia/Vientiane'},
+            {n:'Kuala Lumpur',     iana:'Asia/Kuala_Lumpur'},
+            {n:'Singapore',        iana:'Asia/Singapore'},
+            {n:'Manila',           iana:'Asia/Manila'},
+            {n:'Shanghai',         iana:'Asia/Shanghai'},
+            {n:'Beijing',          iana:'Asia/Shanghai'},
+            {n:'Chengdu',          iana:'Asia/Shanghai'},
+            {n:'Guangzhou',        iana:'Asia/Shanghai'},
+            {n:'Shenzhen',         iana:'Asia/Shanghai'},
+            {n:'Hong Kong',        iana:'Asia/Hong_Kong'},
+            {n:'Taipei',           iana:'Asia/Taipei'},
+            {n:'Macau',            iana:'Asia/Macau'},
+            {n:'Ulaanbaatar',      iana:'Asia/Ulaanbaatar'},
+            {n:'Tokyo',            iana:'Asia/Tokyo'},
+            {n:'Osaka',            iana:'Asia/Tokyo'},
+            {n:'Kyoto',            iana:'Asia/Tokyo'},
+            {n:'Seoul',            iana:'Asia/Seoul'},
+            {n:'Pyongyang',        iana:'Asia/Pyongyang'},
+            {n:'Perth',            iana:'Australia/Perth'},
+            {n:'Adelaide',         iana:'Australia/Adelaide'},
+            {n:'Darwin',           iana:'Australia/Darwin'},
+            {n:'Sydney',           iana:'Australia/Sydney'},
+            {n:'Melbourne',        iana:'Australia/Melbourne'},
+            {n:'Brisbane',         iana:'Australia/Brisbane'},
+            {n:'Canberra',         iana:'Australia/Sydney'},
+            {n:'Auckland',         iana:'Pacific/Auckland'},
+            {n:'Wellington',       iana:'Pacific/Auckland'},
+            {n:'Christchurch',     iana:'Pacific/Auckland'},
+            {n:'Suva',             iana:'Pacific/Fiji'},
+            {n:'Port Moresby',     iana:'Pacific/Port_Moresby'},
+            {n:'Guam',             iana:'Pacific/Guam'},
+            {n:'Apia',             iana:'Pacific/Apia'},
+        ];
+
+        var canvas = document.getElementById('tzCanvas');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        var hoveredOff = null, selectedOff = null;
+        var timezoneInput = document.getElementById('tzHiddenInput');
+        var currentTz = timezoneInput.value || Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!timezoneInput.value) {
+            timezoneInput.value = currentTz;
+            document.getElementById('tzPreferenceLabel').textContent = 'Using device timezone: ' + currentTz;
+            document.getElementById('tzCurrentLabel').textContent = currentTz + ' detected from this device';
+        }
+
+        function snapToValid(raw) {
+            var best = VALID_OFFS[0], bd = Math.abs(raw - best);
+            VALID_OFFS.forEach(function(v) { var d=Math.abs(raw-v); if(d<bd){bd=d;best=v;} });
+            return best;
+        }
+
+        // Seed selectedOff from saved timezone
+        if (currentTz) {
+            VALID_OFFS.forEach(function(off) {
+                var k = String(off);
+                if (TZ_DATA[k] && TZ_DATA[k].indexOf(currentTz) >= 0) selectedOff = off;
+            });
+            if (selectedOff === null) {
+                try {
+                    var raw = -new Date().getTimezoneOffset() / 60;
+                    selectedOff = snapToValid(raw);
+                } catch(e) {}
+            }
+        }
+
+        function offToX(off) { return ((off - MIN_OFF) / RANGE) * canvas.width; }
+        function xToOff(x)   { return MIN_OFF + (x / canvas.width) * RANGE; }
+
+        function draw() {
+            var w = canvas.width, h = canvas.height;
+            var cs        = getComputedStyle(document.documentElement);
+            var bgColor   = cs.getPropertyValue('--form-bg-color').trim()    || '#1a0a2e';
+            var textColor = cs.getPropertyValue('--heading-color').trim()     || '#ffffff';
+            var subColor  = cs.getPropertyValue('--text-color').trim()        || '#cccccc';
+            var accentColor = cs.getPropertyValue('--link-color').trim()      || '#8c88f3';
+
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, w, h);
+
+            // Day/night glow
+            var utcH = new Date().getUTCHours() + new Date().getUTCMinutes()/60;
+            for (var px = 0; px < w; px++) {
+                var lh = ((utcH + xToOff(px)) % 24 + 24) % 24;
+                if (lh >= 5 && lh <= 19) {
+                    ctx.fillStyle = 'rgba(255,220,100,' + (Math.sin(Math.PI*(lh-5)/14)*0.13).toFixed(3) + ')';
+                    ctx.fillRect(px, 0, 1, h);
+                }
+            }
+
+            // Selected band
+            if (selectedOff !== null) {
+                var sx = offToX(selectedOff), bw = Math.max(4, w/RANGE*0.6);
+                ctx.fillStyle = 'rgba(255,128,204,0.18)';
+                ctx.fillRect(sx-bw, 0, bw*2, h);
+                ctx.strokeStyle = 'rgba(255,128,204,0.9)'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx,h); ctx.stroke();
+            }
+
+            // Hover dashes
+            if (hoveredOff !== null && hoveredOff !== selectedOff) {
+                var hx = offToX(hoveredOff);
+                ctx.strokeStyle='rgba(255,128,204,0.38)'; ctx.lineWidth=1;
+                ctx.setLineDash([4,4]);
+                ctx.beginPath(); ctx.moveTo(hx,8); ctx.lineTo(hx,h); ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // UTC grid lines + labels
+            for (var o = MIN_OFF; o <= MAX_OFF; o++) {
+                var gx = offToX(o);
+                ctx.strokeStyle='rgba(128,128,128,0.2)'; ctx.lineWidth=1;
+                ctx.beginPath(); ctx.moveTo(gx,h*0.45); ctx.lineTo(gx,h); ctx.stroke();
+                if (o % 3 === 0) {
+                    ctx.fillStyle = textColor; ctx.font='bold 10px monospace'; ctx.textAlign='center';
+                    ctx.fillText((o>=0?'+':'')+o, gx, 13);
+                }
+            }
+
+            // City dots + labels
+            var lastX = -999;
+            CITIES.forEach(function(c) {
+                var cx = offToX(c.o);
+                if (cx - lastX < 28) return;
+                lastX = cx;
+                ctx.fillStyle = accentColor;
+                ctx.beginPath(); ctx.arc(cx, h*0.57, 2.5, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = subColor; ctx.font='8px sans-serif'; ctx.textAlign='center';
+                ctx.fillText(c.n, cx, h*0.57+12);
+            });
+        }
+
+        function showPills(offset, searchQ) {
+            var pills = document.getElementById('tzPills');
+            var info  = document.getElementById('tzOffsetInfo');
+            var list;
+            if (searchQ && searchQ.length >= 2) {
+                var q = searchQ.toLowerCase();
+                list = [];
+                // City name matches first
+                CITY_TZ.forEach(function(c) {
+                    if (c.n.toLowerCase().includes(q) && list.indexOf(c.iana) < 0) list.push(c.iana);
+                });
+                // Then IANA timezone name matches
+                Object.values(TZ_DATA).forEach(function(arr) {
+                    arr.forEach(function(tz) {
+                        if (tz.toLowerCase().replace(/[/_]/g,' ').includes(q) && list.indexOf(tz) < 0) list.push(tz);
+                    });
+                });
+                info.textContent = list.length ? 'Results (' + list.length + '). Click to save:' : 'No cities or timezones match.';
+            } else if (offset !== null) {
+                list = TZ_DATA[String(offset)] || [];
+                info.textContent = list.length
+                    ? 'UTC'+(offset>=0?'+':'')+offset+': click a timezone to save'
+                    : 'No IANA timezones at this offset.';
+            } else {
+                pills.innerHTML=''; info.textContent='Click the band to pick a UTC offset.'; return;
+            }
+            pills.innerHTML = list.map(function(tz) {
+                var cls = 'tz-pill' + (tz===currentTz?' active':'');
+                var cityMatch = searchQ && searchQ.length >= 2
+                    ? CITY_TZ.find(function(c) { return c.iana === tz; })
+                    : null;
+                var label = cityMatch ? cityMatch.n + ' (' + tz + ')' : tz;
+                return '<button type="button" class="'+cls+'" onclick="selectTz(\''+tz+'\')" title="'+tz+'">'+label+'</button>';
+            }).join('');
+        }
+
+        window.selectTz = function(tz) {
+            currentTz = tz;
+            document.getElementById('tzHiddenInput').value = tz;
+            document.getElementById('tzCurrentLabel').textContent = tz + ' selected';
+            showPills(selectedOff, document.getElementById('tzSearch').value);
+        };
+
+        window.detectAndSetTimezone = function() {
+            try {
+                var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                VALID_OFFS.forEach(function(off) {
+                    if (TZ_DATA[String(off)] && TZ_DATA[String(off)].indexOf(tz) >= 0) selectedOff = off;
+                });
+                selectTz(tz);
+                draw();
+                showPills(selectedOff);
+            } catch(e) { alert('Could not detect timezone.'); }
+        };
+
+        canvas.addEventListener('mousemove', function(e) {
+            var r = canvas.getBoundingClientRect();
+            hoveredOff = snapToValid(xToOff((e.clientX-r.left)*(canvas.width/r.width)));
+            draw();
+            var tt = document.getElementById('tzTooltip');
+            tt.textContent = 'UTC'+(hoveredOff>=0?'+':'')+hoveredOff;
+            tt.style.display = 'block';
+            tt.style.left = Math.min(e.clientX-r.left+8, r.width-80)+'px';
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            hoveredOff = null; draw();
+            document.getElementById('tzTooltip').style.display='none';
+        });
+
+        canvas.addEventListener('click', function(e) {
+            var r = canvas.getBoundingClientRect();
+            selectedOff = snapToValid(xToOff((e.clientX-r.left)*(canvas.width/r.width)));
+            draw(); showPills(selectedOff);
+        });
+
+        document.getElementById('tzSearch').addEventListener('input', function() {
+            var q = this.value.trim();
+            if (q.length >= 2) showPills(null, q);
+            else if (selectedOff !== null) showPills(selectedOff);
+            else { document.getElementById('tzPills').innerHTML=''; document.getElementById('tzOffsetInfo').textContent='Click the band to pick a UTC offset.'; }
+        });
+
+        function resize() {
+            canvas.width  = canvas.clientWidth || 580;
+            canvas.height = 90;
+            draw();
+        }
+        window.addEventListener('resize', resize);
+        requestAnimationFrame(resize);
+
+        if (selectedOff !== null) showPills(selectedOff);
+        else document.getElementById('tzOffsetInfo').textContent = 'Click the band to pick a UTC offset.';
+    })();
+
+    function toggleAppPicker(sel) {
+        var picker = sel.closest('form').querySelector('.popular-apps-picker');
+        if (picker) picker.style.display = sel.value === 'app' ? 'block' : 'none';
+        var urlLabel = sel.closest('form').querySelector('[name="url"]').previousElementSibling;
+        if (urlLabel) urlLabel.textContent = sel.value === 'app' ? 'App URI (e.g. spotify:)' : 'URL';
+    }
+
+    function pickApp(btn, name, uri) {
+        var form = btn.closest('form');
+        form.querySelector('[name="name"]').value = name;
+        form.querySelector('[name="url"]').value = uri;
+    }
+</script>
