@@ -261,6 +261,12 @@ app.get('/', (req, res) => {
 app.get('/login', (req, res) => {
     if (req.session.userId) return res.redirect('/home');
     if (AUTH_HOST) {
+        if (req.query.error) {
+            return res.status(401).render('standard/page', {
+                name: 'Login',
+                body: '<div style="text-align:center;padding:80px 0"><h1>Sign-in failed</h1><p>Your login link was invalid or expired.</p><a href="/login">Try again</a></div>'
+            });
+        }
         const redirect = SERENITY_URL ? `${SERENITY_URL}/auth/sso` : `${req.protocol}://${req.get('host')}/auth/sso`;
         return res.redirect(`${AUTH_HOST}/login?redirect=${encodeURIComponent(redirect)}&app=serenity`);
     }
@@ -469,17 +475,28 @@ app.post('/delete/session/:id', async (req, res) => {
 // ── Work session routes ───────────────────────────────────────────────────────
 
 app.patch('/work/:id/tasks', async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
-    const workSession = await WorkSession.findOne({ _id: req.params.id, userId: req.session.userId });
-    if (!workSession) return res.status(404).json({ error: 'Not found' });
-    workSession.tasks = (req.body.tasks || []).map(t => ({
-        ...(t._id ? { _id: t._id } : {}),
-        name: t.name,
-        duration: t.duration || null,
-        done: t.done || false
-    }));
-    await workSession.save();
-    res.json({ tasks: workSession.tasks });
+    if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
+    try {
+        const workSession = await WorkSession.findOne({ _id: req.params.id, userId: req.session.userId });
+        if (!workSession) return res.status(404).json({ error: 'Session not found' });
+
+        const incoming = Array.isArray(req.body.tasks) ? req.body.tasks : [];
+        workSession.tasks = incoming
+            .filter(t => t && typeof t.name === 'string' && t.name.trim())
+            .map(t => {
+                const dur = t.duration == null ? null : Number(t.duration);
+                return {
+                    ...(mongoose.isValidObjectId(t._id) ? { _id: t._id } : {}),
+                    name: t.name.trim().slice(0, 200),
+                    duration: Number.isFinite(dur) && dur > 0 ? dur : null,
+                    done: !!t.done
+                };
+            });
+        await workSession.save();
+        res.json({ tasks: workSession.tasks });
+    } catch (e) {
+        res.status(500).json({ error: 'Could not save tasks' });
+    }
 });
 
 app.get('/work/:id', async (req, res) => {
